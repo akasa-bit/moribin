@@ -1,0 +1,999 @@
+<title>古文単語547</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+:root{
+  --paper:#E9EBEC; --card:#FCFCFA; --card2:#F2F3F1;
+  --ink:#15181E; --muted:#5D636E; --faint:#8B919B; --rule:#CDD1D5;
+  --ai:#27406E; --ai-soft:#DDE3EF;
+  --shu:#B02F24; --shu-soft:#F3DCD9;
+  --ok:#2C6E54;
+  --shadow:0 1px 2px rgba(20,25,35,.06),0 8px 24px rgba(20,25,35,.07);
+  --serif:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",YuMincho,serif;
+  --sans:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#101319; --card:#1A1E27; --card2:#232834;
+    --ink:#E7E9ED; --muted:#9AA1AE; --faint:#6F7684; --rule:#2E3543;
+    --ai:#93A9DC; --ai-soft:#222B3E;
+    --shu:#E4705C; --shu-soft:#3A2220;
+    --ok:#6FBE9A;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#101319; --card:#1A1E27; --card2:#232834;
+  --ink:#E7E9ED; --muted:#9AA1AE; --faint:#6F7684; --rule:#2E3543;
+  --ai:#93A9DC; --ai-soft:#222B3E;
+  --shu:#E4705C; --shu-soft:#3A2220;
+  --ok:#6FBE9A;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:var(--sans);font-size:15px;line-height:1.7;-webkit-text-size-adjust:100%}
+.wrap{max-width:620px;margin:0 auto;padding-inline:16px;padding-block:0 40px}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;
+  background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--rule);margin-inline:-16px;padding:10px 16px 8px}
+.brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.brand h1{font-family:var(--serif);font-weight:700;font-size:19px;margin:0;letter-spacing:.06em}
+.brand .src{font-size:11.5px;color:var(--faint);letter-spacing:.04em}
+.stats{display:flex;gap:14px;margin-top:6px;font-size:12px;color:var(--muted);
+  font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.stats b{color:var(--ink);font-weight:700}
+.stats .miss b{color:var(--shu)}
+.controls{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}
+select,button{font-family:inherit;font-size:13px;color:var(--ink)}
+select{appearance:none;background:var(--card);border:1px solid var(--rule);border-radius:7px;
+  padding:5px 26px 5px 9px;cursor:pointer;
+  background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),linear-gradient(135deg,var(--faint) 50%,transparent 50%);
+  background-position:calc(100% - 13px) 52%,calc(100% - 9px) 52%;background-size:4px 4px,4px 4px;background-repeat:no-repeat}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:7px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;padding:5px 11px;cursor:pointer;color:var(--muted)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:var(--ai-soft);color:var(--ai);font-weight:700}
+select:focus-visible,button:focus-visible,.card:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+
+.stage{margin-top:22px}
+.card{background:var(--card);border:1px solid var(--rule);border-radius:14px;box-shadow:var(--shadow);
+  position:relative;overflow:hidden;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.card::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--ai);opacity:.55}
+.card.missed::before{background:var(--shu);opacity:.9}
+.face{padding:36px 22px 30px 25px;min-height:190px;display:flex;flex-direction:column;justify-content:center}
+.no{position:absolute;top:12px;left:25px;font-size:11px;color:var(--faint);
+  font-variant-numeric:tabular-nums;letter-spacing:.08em}
+.page{position:absolute;top:12px;right:16px;font-size:11px;color:var(--faint);letter-spacing:.04em}
+.word{font-family:var(--serif);font-weight:500;font-size:clamp(28px,8vw,40px);
+  line-height:1.35;letter-spacing:.04em;text-wrap:balance;margin:0}
+.hint{margin-top:14px;font-size:11.5px;color:var(--faint);letter-spacing:.1em}
+.badge{position:absolute;bottom:12px;right:14px;font-family:var(--serif);font-weight:700;font-size:15px;
+  color:var(--shu);border:1.5px solid var(--shu);border-radius:999px;padding:1px 11px;
+  background:var(--shu-soft);font-variant-numeric:tabular-nums;letter-spacing:.06em;transform:rotate(-3deg)}
+
+.back{border-top:1px dashed var(--rule);padding:18px 18px 20px 25px;background:var(--card2)}
+.kanji{font-family:var(--serif);font-weight:700;font-size:22px;letter-spacing:.05em;color:var(--ai);margin:0 0 12px}
+.kanji .brk{color:var(--faint);font-weight:500}
+.senses{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.senses li{display:flex;align-items:flex-start;gap:10px;padding:5px 0;border-top:1px solid var(--rule)}
+.senses li:first-child{border-top:0}
+.senses .txt{flex:1;font-size:16px;line-height:1.7;min-width:0}
+.senses .mk{font-family:var(--serif);color:var(--faint);font-size:15px;padding-top:1px}
+.sx{flex:none;border:1px solid var(--rule);background:var(--card);border-radius:999px;
+  padding:2px 10px;font-size:12px;color:var(--faint);cursor:pointer;
+  font-variant-numeric:tabular-nums;white-space:nowrap;align-self:center;min-width:44px}
+.sx:hover{border-color:var(--shu);color:var(--shu)}
+.sx.on{color:var(--shu);border-color:var(--shu);background:var(--shu-soft);font-weight:700}
+.note{margin:14px 0 0;padding-top:12px;border-top:1px solid var(--rule);
+  font-size:13px;color:var(--muted);line-height:1.8}
+
+.actions{display:grid;grid-template-columns:44px 1fr 1fr 44px;gap:8px;margin-top:14px}
+.act{border:1px solid var(--rule);background:var(--card);border-radius:10px;padding:11px 6px;cursor:pointer;
+  font-weight:700;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px;transition:transform .08s ease}
+.act:active{transform:scale(.97)}
+.act.miss{color:var(--shu);border-color:color-mix(in srgb,var(--shu) 45%,var(--rule))}
+.act.miss:hover{background:var(--shu-soft)}
+.act.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,var(--rule))}
+.act.nav{color:var(--muted);font-size:17px}
+.act:disabled{opacity:.35;cursor:default}
+.subrow{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:12px;
+  font-size:12px;color:var(--faint);flex-wrap:wrap}
+.linkbtn{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 0;font-size:12px;
+  text-decoration:underline;text-underline-offset:3px}
+.linkbtn:hover{color:var(--shu)}
+
+.listwrap{margin-top:20px}
+.tscroll{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--card)}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-size:11px;letter-spacing:.09em;color:var(--faint);font-weight:500;background:var(--card2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.n{font-variant-numeric:tabular-nums;color:var(--faint);white-space:nowrap}
+td.w{font-family:var(--serif);font-weight:500;white-space:nowrap}
+td.m{color:var(--muted);line-height:1.6}
+td.x{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.x b{color:var(--shu)}
+td.x .brk{display:block;font-size:11px;color:var(--faint);font-weight:400}
+.empty{padding:34px 16px;text-align:center;color:var(--faint);font-size:13.5px}
+footer{margin-top:26px;font-size:11.5px;color:var(--faint);line-height:1.8}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<script type="text/plain" id="src">#p.58
+あいぎやう	愛敬	①愛らしさ	
+あいなし	愛無し	①つまらない	→あぢきなし・えうなし
+あからさまなり		①ついちょっとだ	
+あからめ	離る	①余所見・浮気	
+あきらむ	明らむ	①明らかにする	
+あかに		①満足しないので心残りなので	「えに」＝得ないので／「…がてに」＝…できないので／「しらに」＝知らないので
+あく	飽く	①満足する	「あかず」＝心残りだ
+あくがる	憧る	①さまよい出る ②思い焦がれる	
+あさまし（げなり）	浅まし（げなり）	①驚き呆れた	「あさむ」＝驚き呆れる
+あざやかなり	鮮やかなり	①（魚などが）新鮮である	
+あし	悪し	①悪い ②身分が低い	→よし・よろし・わろし
+あした	朝	①朝	→つとめて
+あそばす	遊ばす	①「す」の《尊敬語》	
+あそび	遊び	①管弦・詩歌・花見・月見の遊び	
+あだ…	徒…	①不真面目で浮気な… ②無駄で一時的な…	「あだなり」＝不真面目で浮気だ・無駄で一時的だ／→いたづらなり・まめ…
+あたらし	惜し	①惜しい	
+あぢきなし	味気無し	①つまらない	→あいなし・えうなし
+あつし	篤し	①病気が重い	
+あてなり	貴なり	①身分が高くて上品だ	「あてびと」＝身分が高くて上品な人／→あやし（げなり）・いやし・しづ
+あな［あや］		①ああ	「あなかま」＝ああやかましいよ／「あやにく」＝ああ嫌だよ／→かまびすし［かしがまし・かまし］・にくし
+あない	案内	①事情・内情 ②取り次ぎ	
+あながちなり	強ちなり	①無理矢理で強引だ	
+あなた	彼方	①遠く離れた時間・以前・将来 ②遠く離れた空間・向こう	
+あなづる	侮る	①見下げる	「あなづらはし」＝見下げたい気分だ
+あはれなり		①しみじみと同情した	「あはれがる」＝しみじみと同情する
+あひぐす	相具す	①連れていく ②結婚して同居する	
+あふ	逢ふ・会ふ・合ふ	①深い仲になる・結婚する ②深い仲にさせる・結婚させる	
+…あへず	…敢へず	①…できない	→え…ず・…かたし・…かぬ
+あへなし	敢へ無し	①張り合いがなくあっけない	
+あまた	数多	①たくさん	→ここら［そこら］・そこばく
+あやし（げなり）	怪し（げなり）／賤し（げなり）・卑し（げなり）	①理解できない ②身分が低くて下品だ	「あやしがる」＝不思議に思う／→あてなり・いやし・しづ
+#p.59
+あやなし		①訳が分からない	
+あやめ	文目	①模様 ②物の違い・区別・道理	
+あらがふ	争ふ	①否定して抵抗する	
+あらたし	新し	①新しい	
+あらはなり	顕なり	①むき出しではっきりとしている	→みそかなり
+あらまし［あらましごと］	あらまし（事）	①予定・計画	
+あらまほし		①理想的だ	
+ありあけ	有り明け	①夜明け頃まで残っている月	
+ありありて	有り有りて	①生き長らえて	
+ありがたし	有り難し	①めったにない（程に素晴らしい）	
+ありく	歩く	①歩き回る・動き回る	
+ありし［ありける・ありつる］		①以前の	
+あるじ	主	①主人 ②もてなし・ごちそう	②は【饗・設け】
+あるやうこそはあらめ		①何かわけがあるのだろう	
+あんず	案ず	①思案する ②心配する	
+いうなり	優なり	①優美だ ②優しく優れている	→やさし
+いかで（か）	如何で（か）	①どうして… ②どのように…《疑問・反語》 ③どうにかして…《仮定・命令・願望・意志・適当》	
+いかに（か）	如何に（か）	①どうして… ②どのように…《疑問・反語》	
+いかが	如何が		「いかがはせむ」＝どうしようか・どうしようもない
+いかめし	厳めし	①重々しく格別だ	
+いぎたなし	寝汚し	①寝坊である	
+いくばく	幾何	①どれほど…《疑問・反語》	
+いさ		①さあ…《疑問・ためらい》	「いさ知らず」＝さあどうだかわからない／→いざ
+いざ		①さあ…《仮定・命令・願望・意志・適当》	「いざさらば」＝さあそれでは／「いざたまへ」＝さあいらっしゃい／「いざなふ」＝誘う／→いさ
+いそぎ	急ぎ	①用意	「いそぐ」＝用意する
+いたし	甚し	①甚だしい ②ほとんど【あまり】…《打消》	→いと・をさをさ…
+いたつき［いたづき］	労・病	①苦労・病気	
+いたづらなり	徒らなり	①死ぬ ②無駄で一時的だ	「徒らに成る」＝死ぬ／→つゆときゆ・はかなくなる・みまかる・むなしくなる／→あだ…
+いたはし	労し	①苦しい程に（相手が）気の毒で可哀想だ	→こころぐるし
+いつく	慈く・傅く	①大切にする	「いつくしむ」＝大切にする／→かしづく
+いづく（にか）［いづこ・いづち・いづら］	何処（にか）・何方・何ら	①どこ…《疑問・反語》	
+いつしか	何時しか	①早く… ②いつか…《仮定・命令・願望・意志・適当》	
+#p.60
+いと		①とても ②ほとんど【あまり】…《打消》	→いたし・をさをさ…
+いとど		①いっそうますます	→いよいよ
+いとほし		①不都合で嫌だ ②気の毒で可哀想だ	→ふびんなり・びんなり
+いとま	暇	①暇 ②暇乞い・離別・死別	
+いぬ	去ぬ・往ぬ	①空間的に移り去る ②時間的に過ぎ去る	
+いぬ	寝ぬ	①寝る	→いをぬ
+いなむ［いなぶ］	否む・辞む［否ぶ・辞ぶ］	①辞退する・拒否する	
+いはけなし［いとけなし］	稚けなし	①幼い	
+いぶかし	訝し	①はっきりしなくて気になる	
+いふかたなし［いはむかたなし］	言ふ方無し［言はむ方無し］	①言いようがない	
+いふかひなし	言ふ甲斐無し	①言いようがない ②言いようがなく素晴らしい ③言いようがなくひどい	→えもいはず
+いぶせし		①気が晴れない	
+いふもおろかなり	言ふも疎かなり	①いくら言っても言い尽くせない	→おろかなり
+いまいまし	忌ま忌まし	①縁起が悪い	
+います［いますかり・いますがらふ］	在す［在すかり・在すがらふ］	①「有り・居り・行く・来」の《尊敬語》	→おはす［おはさふ・おはさうず］・おはします［おはしまさふ］・ます［まします］
+いまめかし	今めかし	①目新しく現代風だ	「いまめく」＝目新しく現代風になる
+いみじ	忌忌じ	①とても ②とても素晴らしい ③とてもひどい	→ゆゆし
+いも	妹	①姉妹 ②妻・愛するあなた（女性）	→せ
+いやし	賤し・卑し	①身分が低くて下品だ	→あやし（げなり）・あてなり・しづ
+いよいよ	愈愈	①いっそうますます	→いとど
+いらへ	答へ・応へ	①返事	「いらふ」＝返事する
+いろ	色	①風流 ②恋愛	→すき・なさけ
+いをぬ［いもぬ・ぬ］	寝を寝［寝も寝・寝］	①寝る	→いぬ
+うけたまはる	承る	①「聞く」の《謙譲語》	
+うし	憂し	①憂鬱で辛い	→からし【辛し】
+うしろめたし	後ろ目痛し・後ろ見たし	①頼りなく不安だ	→うしろやすし
+うしろやすし	後ろ安し	①頼もしく安心だ	→うしろめたし・こころやすし
+うす	失す	①消える・死ぬ	
+うたかた	泡沫	①はかなく消えやすい水の泡	
+うたて（し）	転て（し）	①嫌だ	→にくし
+うち	内・内裏	①天皇 ②宮中	
+うちつけなり	打ち付けなり	①突然だ ②軽率だ	
+#p.61
+うつくし	愛し	①（客観的に）かわいらしい	→らうたし
+うつつ	現	①現実	
+うつろふ	移ろふ	①色が褪せる ②心が離れる	
+うとし	疎し	①疎遠で素っ気ない	
+うへ	上	①天皇 ②北の方・奥方・正妻	
+うみす［うんず・うず］	倦みす［倦んず・倦ず］	①うんざりする	
+うらなし	心無し	①心の隔てなくざっくばらんだ	
+うるさし	煩し	①面倒で嫌だ ②巧みで賢い	→むつかし・うるせし
+うるせし		①巧みで賢い	→うるさし
+うるはし	麗し	①整って美しい	
+えうなし	要無し	①つまらない	→あいなし・あぢきなし
+え…ず	得…ず	①…できない	→あへず・えもいはず・…かたし・…かぬ
+えもいはず	えも言はず	①言いようもない ②言いようもなく素晴らしい ③言いようもなくひどい	→いふかたなし［いはむかたなし］
+えんなり	艶なり	①優雅だ・優美だ・上品だ ②妖艶で色っぽい	→なまめかし
+おいらかなり		①おっとり落ち着いた	
+おきつ	掟つ	①決定する ②命令する	
+おくる	後る	①後になる・劣る ②後に残される・死に後れる	「おくらす」＝後に残す・先に死ぬ
+おこす	遣す	①（物を）送ってくる ②（人を）よこす	「…おこす」＝遠くから近くに…する／→やる
+おこたる	怠る	①病気が良くなる ②怠る	→なやむ・わづらふ
+おこなふ	行ふ	①仏前勤行する ②仏道修行する	「おこなひ」＝仏前勤行・仏道修行／→ぎやうず
+おづ	怖づ	①恐れておどおどする	
+おと	音	①音・擦れ・訪れ ②噂・評判	「おとなふ」＝音を立てる・訪れる／→おぼえ・きこえ・な
+おとど［おほいどの］	大臣・大殿	①大臣	
+おとと	弟・妹	①弟・妹	
+おとなし	大人し	①大人っぽい ②思慮分別がありしっかりしている	→をさをさし
+おどろく	驚く	①目が覚める ②はっと気が付く	
+おどろおどろし		①仰々しくてものすごい ②非常に不気味で恐ろしい	
+おのがじし	己がじし	①めいめい思い思いに	
+おのづから	自ら	①自然と ②たまたま・偶然 ③万一…《仮定》	→たまさかなり
+おはす［おはさふ・おはさうず］／おはします［おはしまさふ］	御座す／御座します	①「有り・居り・行く・来」の《尊敬語》	→います・ます［まします］
+#p.62
+おほけなし	大気甚し	①身分不相応だ	
+おぼえ	覚え	①噂・評判 ②（主に男性に対する）信望 ③（主に女性に対する）寵愛	→おと
+おほす	仰す	①「言ふ」の《尊敬語》	→のたまふ［のたまはす］
+おぼす［おぼしめす］	思す［思し召す］	①「思ふ」の《尊敬語》	
+おぼつかなし	覚束無し	①はっきりしない ②待ち遠しくそわそわしている ③気がかりでそわそわしている	→こころもとなし
+おほとのごもる	大殿籠る	①「寝」の《尊敬語》	
+おほやけ	公	①天皇 ②朝廷	
+おぼろけなり		①並・一通りで平凡で普通だ ②「おぼろけならず」＝並・一通りでなくて非凡で格別だ	
+おもて	面	①顔 ②面目	「おもてぶせ」＝不名誉／「おもておこし」＝名誉
+おもしろし	面白し	①興味深い ②趣深い ③滑稽だ	→をかし（げなり）
+おもひやる	思ひ遣る［心遣る］	①思いを馳せる ②気分を晴らす	→やる
+およすく	老よすく	①成長する・大人になる・年をとる	→ねぶ［ねびゆく］
+おろかなり	疎かなり	①不十分だ	→いふもおろかなり
+おんぞ［おほんぞ・みそ・みけし］	御衣	①お召し物	
+かいまみる	垣間見る	①垣根の隙間から覗き見する	
+かきくらす	掻き暗す	①心を暗くする	
+かぎり	限り	①時期 ②限度 ③臨終	「いまはかぎり」＝もはやこれまで
+かげ	影	①光 ②姿	
+かけて…		①少しも【全く・決して】…《打消》	→さらに…・たえて…・つやつや…・ゆめ（ゆめ）…・よに…
+かこつ	託つ	①不平不満を言う	「かごと」＝不平不満
+かしこ	彼処	①あそこ・あちら	
+かしこし	畏し・恐し	①畏れ多い ②賢く優れている	「かしこく」＝うまく【非常に】…する／→かたじけなし・さかし・さとし
+かしこまり	畏まり	①畏れ多いこと ②お詫び ③お礼 ④お咎め	
+かしづく	傅く・頭付く	①大切に世話する	→いつく
+かしらおろす	頭下ろす	①出家する	→かたちをかふ・ちりをいづ・みぐしおろす・やまずみす・よをいとふ［かる・すつ・そむく・のがる］
+かずまふ［かぞまふ］	数まふ	①一人前として数に入る	
+かたくななり	頑ななり	①思慮分別がなく趣を解さない	→すくよかなり・ふつつかなり
+かたし	難し	①…できない	→あへず・え…ず・…かぬ
+#p.63
+かたじけなし	辱し・忝し	①畏れ多い	→かしこし
+かたち	形・容・貌	①容貌	
+かたちをかふ	形［容・貌］を変ふ	①出家する	→かしらおろす・ちりをいづ・ほつしんす・みぐしおろす・やまずみす・よをいとふ［かる・すつ・そむく・のがる］
+かたはらいたし	傍ら痛し	①側で見聞して苦々しい ②側で見聞されて苦々しい	
+かたほなり	片秀なり	①不完全だ	→まほなり
+かたへ	片方	①一方（の人） ②側（の人）	
+かたみに	互（に）	①お互い（に）	
+かたみ	形見	①思い出す拠り所	
+かち	徒歩	①徒歩	
+かづく	被く・肩付く／潜く	①頭にかぶる・褒美をもらう《四段》 ②頭にかぶせる・褒美を与える《下二段》 ③潜る【潜く】	
+かつ（は）	且つ（は）	①とりあえずちょっとすぐに	「かつは…かつは…」＝一方では…もう一方では…
+かなし	愛し・悲し	①愛しい ②悲しい	
+かなふ	適ふ・叶ふ	①ぴったりと合う ②思い通りになる	
+…かぬ		①…できない	→…あへず・え…ず・…かたし
+かはゆし	顔映ゆし	①見ていられない程に恥ずかしい ②見ていられない程に痛ましい	
+かまへ	構へ	①用意	「かまふ」＝用意する／→いそぎ・まうけ・ようい
+かまへて［さだめて］	構へて［定めて］	①必ず… ②決して…《打消》	
+かまびすし［かしがまし・かまし］	喧し	①やかましい	→あな［あや］
+からし	辛し	①残酷で辛い	つらし／→うし
+からむ	搦む	①捕らえて縛る	
+…がり	…の許	①…の所へ	
+かりそめなり	仮初めなり	①一時的でほんのちょっとだ	
+かる	離る／枯る	①離れる ②枯れる	→よがれ
+きこえ	聞こえ	①噂・評判	→おと・な
+きこゆ［きこえさす］	聞こゆ［聞こえさす］	①噂・評判になる ②訳が分かって理解できる ③「言ふ」の《謙譲語》	→けいす・そうす・まうす
+きこす［きこしめす］	聞こす［聞こし召す］	①「聞く」の《尊敬語》	
+きたのかた	北の方	①貴族の正妻	
+きと		①きっとしっかりと ②さっとちょっと	
+きは	際	①端・境界・最後 ②（人の程度）年齢・身分	→ほど
+きはやかなり［けざやかなり］	際やかなり	①際だって鮮やかだ	
+ぎやうず	行ず	①仏前勤行する ②仏道修行する	→おこなふ
+#p.64
+きようず	興ず	①面白がる	
+きんだち	公達・君達	①貴族の子息子女	
+くさ	草・藻	①（物事を起こすもととなる）種	「くさぐさ」＝種種（の）
+ぐす	具す	①（物を）持っていく ②（人を）連れていく ③いっしょにいる	
+くぜち［くぜつ］	口説・口舌	①弁論 ②口論	
+くちをし	口惜し	①残念だ	
+くつ	朽つ	①衰える・死ぬ	
+くまなし	隈無し	①黒い所や暗い所や見えない所がない	
+くもゐ［くものうへ］	雲居［雲の上］	①宮中	→ここのへ
+くんず	屈ず	①気が滅入ってふさぎ込む	
+けいす	啓す	①「（中宮・春宮に）言ふ」の《謙譲語》	→きこゆ［きこえさす］・そうす・まうす
+けうなり	希［稀］有なり	①珍しくて驚くべきだ	
+けうらなり［きよらなり・きよげなり］	清らなり［清らなり・清げなり］	①清らかで美しい	
+けし	怪し・異し	①悪くて変だ	「けしうはあらず」＝悪くなくて変でない／「けしからず」＝悪くて変だ
+けしき	気色	①（物の）様子・情景 ②（人の）様子・機嫌	「けしきばかり」＝少しばかり／「けしきばむ」＝様子が外に表れる／→てんき
+けに	異に	①妙に	
+げに	実に	①なるほど本当に	
+けやけし	異やけし	①目立っている	
+こうず	困ず	①困って疲れる	
+こがす	焦がす	①炭で焦がして香を焚きしめる ②胸を焦がして心を苦しめる	
+ここのへ	九重	①宮中	→くもゐ［くものうへ］
+ここら［そこら］	幾許	①たくさん・そこばく	→あまた
+こころあり	心有り	①思慮分別があり趣を解する	「こころなし」＝思慮分別がなく趣を解さない
+こころう	心得	①理解する	
+こころぐるし	心苦し	①辛い ②辛い程に（相手が）気の毒で可哀想だ	→いたはし
+こころづく	心付く	①気に入る	「こころづきなし」＝気に入らない
+こころにくし	心憎し	①奥ゆかしい	
+こころづくし	心尽くし	①物思いの限りを尽くすこと	
+こころもとなし	心許無し	①はっきりしない ②待ち遠しくそわそわしている ③気がかりでそわそわしている	→おぼつかなし
+こころやすし	心安し	①頼もしく安心だ	→うしろめたし・うしろやすし
+こしかた［きしかた］	来し方	①これまでの過去	→ゆくすゑ［ゆくさき］
+こしをれ	腰折れ	①下手な歌	
+#p.65
+こぞ	去年	①去年	
+こちごちし［こちなし］	骨骨し［骨無し］	①無骨で不作法で無風流だ	
+こちたし	言甚し	①大げさだ	→うるさし
+こと	言	①言葉	「ことのは」＝和歌・漢詩／→こちたし
+こと	事	①事柄	「ことごとし」＝大げさだ／「ことなしぶ」＝何でもない様子をする
+こと	異	①異なった	「ことはら」＝腹違いの兄弟姉妹／→はらから
+ことに	殊	①殊更・特殊	「ことに」＝格別に・特別に
+ことわり	理	①道理・もっともなこと	
+ことわる	理る・事割る・断る	①細かく順序立てて説明する	→わりなし
+このかみ	子の上・兄	①年上の人・年長の人	
+こはし	強し	①強い	
+こぼつ	毀つ	①壊す	→やる
+こまやかなり	細やかなり	①細々として詳しい ②濃厚だ	
+こよなし		①この上なく格別だ	「こよなく」＝この上なく格別に
+こらんず	御覧ず	①「見る」の《尊敬語》	→みそなはす
+さう	左右	①あれこれ迷うこと	「さうなし」＝あれこれ迷うことがない
+さう	双	①並ぶもの	「さうなし」＝並ぶものがない／→になし・またなし
+さうざうし	索索し	①もの寂しい	
+ざえ	才	①才能・見所	【かど】
+さが	性	①人間の本性 ②人間の習慣	「さがなし」＝意地が悪い
+さかし	賢し	①利口ぶって差し出がましい	「さかしだつ」＝利口ぶって差し出がましい／「さかしら」＝利口ぶって差し出がましくする／→かしこし・さとし
+さくりもよよ（と）	吃逆もよよ（と）	①しゃくりあげ激しく泣く様子	
+…さす	…止す	①…することを途中でやめる	
+さすがに		①（そうは言うものの）やはり	→なほ
+さながら［しかながら］	然ながら	①そっくりそのまますべて ②しかしながら	
+さはり	障り	①差し障り	「さはる」＝差し障りがある
+さばれ［さはれ］	然ばれ	①どうにでもなれ ②そうではあるが	「さは有れ」
+さぶらふ	候ふ	①「有り・居り」の《丁寧語》 ②「仕ふ」の《謙譲語》	→はべり
+さとし	聡し	①賢く優れている	→かしこし・さかし
+さやけし［さやかなり］	分明けし［分明なり］	①明るく澄んでいて清々しく潔白だ	
+さらなり	更なり	①今更言うまでもなくもちろんだ	「いへばさらなり」【言へば更なり】
+さらに…		①少しも【全く・決して】…《打消》	→かけて…・たえて…・つやつや…・ゆめ（ゆめ）…・よに…
+#p.66
+さらぬ…	然らぬ…	①そうでない…別の…	
+さりとて	然有りとて	①（そう）だからといって	「さりとてやはある」＝このままではあるまい［おれまい］
+さる	去る	①避けられない	「さらぬ…」
+さる	然有る	①そうである	「さるは【然るは】」＝そうであるが実は／「さるものにて」「さるかたにて」
+さる	去る	①（時・季節などが）来る	「ゆふさる」＝夕方になる
+さるべき［しかるべき］	然るべき［然かるべき］	①ふさわしい ②立派な ③（そうあるはずで）宿命的な	
+さわがし	騒がし	①忙しい	
+しげし	繁し	①多い	
+したたむ	認む	①きちんと片付け整える	
+したりがほ	したり顔	①得意顔・満足顔	
+しづ	賤	①身分が低くて下品なこと	→あてなり・あやし（げなり）・いやし
+しどけなし		①くつろいでいてだらしがない	
+しののめ	東雲	①東の雲がほのかに明るくなる夜明け方	
+しとどに		①（雨などで）びっしょり・ぐっしょり	
+しのぶ	忍ぶ・偲ぶ	①我慢する ②人目を避ける ③思い慕う	
+しはぶき	咳	①咳（払い）	
+しほたる	潮垂る	①泣く	
+しらなみ［はくは・はくらう］	白波・白浪	①白く泡立つ大波 ②海賊・山賊	
+しりうごと	後言	①陰口	「しりうごつ」＝陰口を言う
+しる	知る・領る	①（国を）治める	
+しるし	験	①霊験 ②前兆 ③効果	
+しるし	著し	①著しくてはっきりしている	
+しるべ	知る辺・導・標	①道案内	
+しろす［しろしめす］	知ろす［知ろし召す］	①「治む」「知る」の《尊敬語》	
+しんめう	神妙	①超越して不思議で素晴らしい様子	
+しんわう	親王	①皇子（の位）	
+すき	数奇・好き	①風流 ②恋愛	「すきずきし」＝風流好きだ・恋愛好きだ／→いろ・なさけ
+すくせ	宿世	①宿命	
+すくよかなり	健よかなり	①体が太くて丈夫だ ②思慮分別がなく趣を解さない	→かたくななり・ふつつかなり
+すさぶ	荒ぶ・遊ぶ	①気の向くままに遊ぶ	
+すさまじ［すごし］	凄じ［凄し］	①もの寂しく興醒めだ	
+すずろなり［そぞろなり］	漫ろなり	①何ということもなく不意だ ②むやみやたらだ ③つまらない	
+すだく	集く	①集まる	
+ずちなし	術無し	①どうしようもない	→せむかたなし［やるかたなし］
+すなはち	即ち・乃ち・則ち	①すぐに ②そこで	
+#p.67
+すます	澄ます・清ます	①（光・音・心を）澄ませる	「…すます」＝心を込めて…する
+すまふ	争ふ・辞ふ	①抵抗する	
+すゑ	末	①子孫	
+せ	兄・背	①兄・弟 ②夫・愛するあなた（男性）	→いも
+せうそこ	消息	①返事・連絡 ②挨拶・訪問	
+せきあへず	堰き敢へず・塞き敢へず	①涙をせき止めることができない	→…あへず
+せちに［せめて］	切に［切めて］	①無理に切実に	
+せむかたなし［やるかたなし］	為む方無し［遣る方無し］	①どうしようもない	→ずちなし
+せんざい	前栽	①庭の植え込み	
+そうす	奏す	①「（帝・院に）言ふ」の《謙譲語》	→きこゆ［きこえさす］・けいす・まうす
+そこはかとなし		①何となくとりとめもない	→はかばかし
+そこばく	幾許	①たくさん	→あまた・ここら［そこら］
+そしる	謗る	①非難する	→なんず・もどく
+そで［たもと］	袖［袂］	①涙で濡れた袖［袂］	「そでのつゆ」＝涙／「そでひつ・そでしぼる」＝泣く
+そのかみ	其の上	①その当時	
+そのこととなく	其の事と無く	①これということもなく	
+そばむ	側む	①側向く	
+そほつ［そぼづ・そぼふる・そぼぬる］	濡つ［濡づ・濡降る・濡濡る］	①しっとりと濡れる ②（雨などが）しとしとと降る	
+…そむ	…初む	①…し始める ②初めて…する	→…はつ
+そら…	虚…	①嘘の…	「そらごと」＝嘘／「そらなき」＝嘘泣き
+そらなり	空なり	①空虚で根拠がない	「そらに」＝暗記して
+ぞんず	存ず	①「思ふ」の《謙譲語》	
+たいだいし	怠怠し	①もってのほかだ	
+たえて…		①少しも【全く・決して】…《打消》	→かけて…・さらに…・つやつや…・ゆめ（ゆめ）…・よに…
+たがふ	違ふ	①違う	→ちがふ・よそふ
+たぐふ	類ふ・比ふ	①寄り添う ②例える・準える	「たぐひなし」＝並ぶものがない程だ／→よそふ
+たく	長く	①年を重ねる	
+たけし	猛し	①強く勇ましい	
+たづき［たつき］	方便	①手段方法	「たづき［たつき］なし」＝頼りとするところがない／→たより
+たてまつる	奉る	①「与ふ」の《謙譲語》 ②「飲む・食ふ・着る・乗る」の《尊敬語》《四段》	
+たのむ	頼む	①頼みに思う・あてにする《四段》 ②頼みに思わせる・あてにさせる《下二段》	
+#p.68
+たのもしきひと	頼もしき人	①世話をしてくれる人	→みるひと
+たばかる	謀る	①計画する	
+たふ	堪ふ・勝ふ	①我慢する・能力がある	
+たまさかなり	偶なり	①たまたまだ・偶然だ ②万一…《仮定》	→おのづから
+たまのを	玉の緒	①（短くはかない）命	
+たまはる	賜はる	①「受く」の《謙譲語》	
+たまふ［た（う）ぶ・たまはす］	給ふ［賜ぶ・賜はす］	①「与ふ」の《尊敬語》	
+たまゆら	玉響	①ほんのちょっとの間	
+たゆむ	弛む	①心がゆるむ	
+たより	便り・頼り	①手段方法 ②頼りとするところ	→たづき［たつき］
+たをやかなり	手弱かなり・嫋やかなり	①柔らかでしなやかだ	「たをたを（と）」＝柔らかでしなやかに
+ちがふ	交ふ	①行き違う・すれ違う ②交差する・入り交わる	→たがふ
+ちぎり	契り	①約束 ②深い仲 ③前世からの宿命	
+ちりをいづ	塵を出づ	①出家する	→かしらおろす・かたちをかふ・ほつしんす・みぐしおろす・やまずみす・よをいとふ［かる・すつ・そむく・のがる］
+ついで	序	①順序 ②機会・ついで	
+ついゐる	突き居る	①ちょこんと畏まって跪く	
+つかうまつる	仕（う）奉る	①「す」の《謙譲語》	
+つきごろ	月頃	①ここ数か月ずっと	→としごろ・ひごろ
+つきづきし	付き付きし	①ふさわしい	「つきなし」＝ふさわしくない／→にげなし
+つく	付く／尽く	①生じる・起こる ②無くなる・終わる	②は【尽く】
+つごもり	晦・晦日・月隠り	①月末	「おほつごもり」＝年末
+つたなし	拙し	①下手だ ②不運だ	
+つつむ	慎む	①気にする・遠慮する	→ところおく・はばかる
+つと		①じっと ②さっと	
+つとめて		①早朝	→あした
+つま	端・棟・爪	①端・へり・際	
+つま	夫・妻	①夫・妻	
+つや（つや）…		①少しも【全く・決して】…《打消》	→かけて…・さらに…・たえて…・ゆめ（ゆめ）…・よに…
+つゆ…		①少しも【全く・決して】…《打消》	→かけて…・さらに…・たえて…・つやつや…・ゆめ（ゆめ）…・よに…
+つゆけし	露けし	①湿っぽい ②涙がちだ	
+つゆときゆ	露と消ゆ	①死ぬ	→いたづらになる・はかなくなる・みまかる・むなしくなる
+つら	面	①顔 ②表面 ③側・脇・ほとり	
+#p.69
+つれづれなり	徒然なり	①所在ない	
+つれなし	連れ無し	①無関係だ ②無感動だ ③無反応だ	
+て	手	①文字・筆跡 ②楽器・機織りなどの腕前	→をとこで・をんなで
+てうず	調ず・嘲ず	①調理する ②調伏する・嘲る・懲らしめる	
+てづつなり	手づつなり	①不器用で下手だ	
+てんき	天気	①天皇の様子・ご機嫌	→けしき
+とが	咎・科	①罪	
+とかく［とざまかうざま］		①とてもかくても・とにもかくにも	
+ともあれかくもあれ［とまれかくまれ］		①あれ（や）これ（や） ②何はともあれ	
+どち		①親しい仲間	
+としごろ	年頃	①ここ数年ずっと	→つきごろ・ひごろ
+とし	疾し	①早い・速い	「とく」＝早く…する・速く…する
+ところせし	所狭し	①窮屈だ ②あたりを圧倒している	
+ところおく	所置く	①気にする・遠慮する	→つつむ・はばかる
+ところう	所得	①我がもの顔で得意そうにする	
+ときめく	時めく	①時流を受けて栄える	
+ときしも（あれ）	時しも（あれ）	①ちょうどその時	
+とぶらふ	訪ふ／弔ふ	①（生者を）訪ねる・見舞う ②（死者を）弔問する・供養する	②は【弔ふ】
+とばかり		①ちょっとばかり	
+とみなり	頓なり	①突然だ	→にはかなり・ゆくりなし
+とむ	尋む・求む	①跡を付けて探し求める	
+な	名	①噂・評判	→おと・きこえ
+ないしんわう	内親王	①皇女（の位）	→しんわう
+なかなか	中中	①かえって・むしろ	「なかなかなり」＝中途半端だ
+ながむ	眺む／詠む	①ぼんやりと物思いに耽る ②（和歌・漢詩を）朗詠する	②は【詠む】
+ながらふ	永らふ	①生き長らえる	
+なごり	名残・波残り・余波	①心残りな別れ ②心残りな別れの後に残った形見	
+なさけ	情け	①風流 ②恋愛 ③思いやり	→いろ・すき
+…なくに		①…ないのに	
+…なす	…為す	①意識的に…する	
+な…そ		①…してくれるな	
+なつかし	懐かし	①親しみが持て心ひかれる	
+なづむ	泥む	①拘って執着して思い悩んで停滞する	
+なでふ	何と言ふ	①何という	
+など（て）［なに・なぞ］	何（て）［何・何ぞ］	①どうして…《疑問・反語》	
+#p.70
+なに（し）おふ	名に（し）負ふ	①その名を持っている ②名高い	
+なのめなり	斜めなり	①並・一通りで平凡で普通だ ②「なのめならず」＝並・一通りでなくて非凡で格別だ	→おぼろけなり
+なべて	並べて・並手	①おしなべて一般に	
+なほ	猶・尚	①（そうは言うものの）やはり ②その上なお一層	→さすがに
+なほざりなり	等閑なり	①本気でなくいい加減だ	
+なま…	生	①何となく少し…《用言》 ②若くて未熟な…《体言》	「なまにくし」＝何となく少し嫌だ／「なまざぶらひ」＝若くて未熟な侍／→なまめかし・にくし
+なまめかし	生めかし	①優雅だ・優美だ・上品だ ②若くて瑞々しい	→えんなり・なま…
+なめし［なめげなり］	無礼し［無礼げなり］	①無礼だ	
+なやむ	悩む	①悩んで病気になる	→わづらふ・おこたる
+ならふ	慣らふ・馴らふ	①慣れる	
+なりはひ	生業	①生計	
+なんず	難ず	①非難する	→そしる・もどく
+にくし	憎し	①嫌だ	→あな［あや］・うたて（し）・なま…
+にげなし	似気無し	①ふさわしくない	→つきづきし
+になし	二無し	①並ぶものがない	→さうなし・またなし
+にはかなり	俄なり	①突然だ	→とみなり・ゆくりなし
+にほひ	匂ひ	①色つやの美しさ ②威光・気品	
+ぬか	額	①額	「ぬかづく」＝お辞儀をする・礼拝する
+ねたし	名痛し・嫉し・妬し	①悔しくてしゃくだ ②悔しくてしゃくな程に（相手が）立派だ	→はづかし
+ねぶ［ねびゆく］		①成長する・大人になる・年をとる	「ねびびと」＝老人／→およすく
+ねむごろなり	懇ろなり	①熱心だ ②丁寧だ ③親密だ	
+ね（を）なく	音（を）泣く	①声をあげて号泣する	
+ねんず	念ず	①祈る ②我慢する	
+のたまふ［のたまはす］	宣ふ［宣はす］	①「言ふ」の《尊敬語》	→おほす
+ののしる	罵る	①大声でわいわい騒ぐ	
+はかなくなる	果無く成る	①死ぬ	→いたづらになる・つゆときゆ・みまかる・むなしくなる
+はかばかし		①はっきりしている ②きちんとしていて頼もしい	「はかなし」＝はっきりしない・きちんとしていなくて頼りない／→そこはかとなし
+#p.71
+…はつ	…果つ	①…し終わる ②すっかり…する	→…そむ
+はづかし	恥づかし	①決まりが悪い ②決まりが悪い程に（相手が）立派だ	→ねたし
+はつかなり	僅かなり	①ほんの少しだ	
+はなむけ	餞・鼻向け	①門出する人の安全を祈る贈り物や言葉	
+はばかる	憚る	①気にする・遠慮する	→つつむ・ところおく
+はべり	侍り	①「有り・居り」の《丁寧語》 ②「仕ふ」の《謙譲語》	→さぶらふ
+はらから	腹から・同胞	①兄弟姉妹	「ひとつはら」＝同腹の兄弟姉妹／「ことはら」＝腹違いの兄弟姉妹／→こと
+ひが…	僻…	①間違った…	「ひがひがし」＝間違った／「ひがおぼえ［ひがみみ・ひがめ］」＝覚え間違い［聞き間違い・見間違い］
+ひごろ	日頃	①ここ数日ずっと	→つきごろ・としごろ
+ひたぶる（なり）	一向（なり）・頓（なり）	①ひたすら（だ）	
+ひとかたならず	一方ならず	①一様でない・普通でない	
+ひとひ	一日	①先日	
+ひとりごつ	独り言つ	①独り言を言う	
+ひとわろし	人悪し	①みっともなく恥ずかしい	
+ひねもす（に）［ひ（も）すがら］	終日（に）［日（も）すがら］	①一日中・昼中	→よ（も）すがら
+ひま	暇／隙	①絶え間 ②隙間	「ひまなし」＝絶え間がない・隙間がない／②は【隙】
+ひる	干る	①乾く	
+びんなし	便無し	①不都合で嫌だ ②気の毒で可哀想だ	→いとほし・ふびんなり
+ふうが	風雅	①優雅さ・優美さ・上品さ ②詩歌・文芸・俳諧	→みやび
+ふつつかなり	太束なり	①体が太くて丈夫だ ②思慮分別がなく趣を解さない	→かたくななり・すくよかなり
+ふびんなり	不便なり	①不都合で嫌だ ②気の毒で可哀想だ	「ふびんにす」＝気にかける／→いとほし・びんなし
+ふみ	文	①手紙・文書・書物	
+ふる	旧る・古る	①（物が）古くなってさびれる ②（人が）年をとって盛りが過ぎる	
+ふるさと	古里・故郷	①古くなってさびれた昔の都 ②昔なじみの土地や家	
+ふりさけみる	振り放け見る	①遥か遠くを仰ぎ眺める	
+べちなり	別なり	①別だ ②特別だ・格別だ	
+ほい	本意	①本来的な意志 ②本質的な意味	「ほいなし」＝《意志・意味がなく》残念だ
+ほだし	絆	①我が身を束縛するもの ②出家や極楽往生の妨げとなるもの	
+ほつしんす	発心す	①出家する	→かしらおろす・かたちをかふ・ちりをいづ・みぐしおろす・やまずみす・よをいとふ［かる］
+#p.72
+ほど	程	①（物の程度）様子・状態 ②（人の程度）年齢・身分 ③（時間の程度）頃・時節・期間 ④（空間の程度）長さ・広さ・大きさ	→きは
+まうけ	設け	①用意	「まうく」＝用意する／→いそぎ・かまへ・ようい
+まうす	申す	①「言ふ」の《謙譲語》	→きこゆ［きこえさす］・けいす・そうす
+まうづ［まうでく］	詣づ［参で来］	①「行く・来・詣で来」の《謙譲語》	→まかる［まかづ］・まゐる
+まがふ	紛ふ	①入り乱れて見分けがつかない	
+まがまがし	禍禍し	①縁起が悪く不吉で忌々しい	
+まかる［まかづ］	罷る・罷づ	①「行く・来・出づ」の《謙譲語》	→まうづ［まうでく］・まゐる
+まさなし	正無し	①良くない	→わろし
+ます［まします］	坐す［坐します］	①「有り・居り・行く・来」の《尊敬語》	→います［いますかり・いまそがり］・おはす［おはさふ・おはさうず］・おはします［おはしまさふ］
+まし［いまだし］	未し［未だし］	①未熟だ	「まだき（も）」＝早々と…する
+またし	全し	①完全だ	
+またなし	又無し	①並ぶものがない	→になし・さうなし
+まどろむ	微睡む	①うとうとする	
+まなぶ	真似ぶ・学ぶ	①見聞したことをそのまま人に語る ②習得する	
+まほなり	真秀なり	①完全だ	→かたほなり
+まらうと［まらうど・まれうと・まれびと］	稀人・賓・客人	①客	
+まもる［まぼる］	目守る［守る］	①見守る ②監視する	
+まめ…	真実	①真面目で誠実な… ②実用的で本格的な…	「まめまめし［まめ（やか）なり］」＝真面目で誠実だ・実用的で本格的だ／→あだ…
+ままに	儘に・随に	①…にまかせて・につれて ②…ので ③…とすぐに・やいなや	
+まゐらす	参らす	①「与ふ」の《謙譲語》	
+まゐる	参る	①「行く・来・出づ」の《謙譲語》 ②「飲む・食ふ・着る・乗る」の《尊敬語》 ③世話をする	→まうづ・まかる・たてまつる・まゐらす
+まろぶ	転ぶ	①転んで倒れる	
+みぐしおろす	御髪下ろす	①出家する［なさる］	→かしらおろす・かたちをかふ・ちりをいづ・ほつしんす・やまずみす・よをいとふ［かる・すつ・そむく・のがる］
+みそかなり	密かなり	①内緒でこっそりとしている	→あらはなり
+みそなはす	見そなはす	①「見る」の《尊敬語》	→ごらんず
+みまかる	身罷る	①死ぬ	→いたづらになる・つゆときゆ・はかなくなる・むなしくなる
+みやび	雅	①優雅さ・優美さ・上品さ	→ふうが・いうなり・やさし
+みゆき	行幸	①天皇のお出かけ	
+みる	見る	①会う ②結婚する ③世話をする	→みるひと
+#p.73
+みるひと	見る人	①世話をしてくれる人	→たのもしきひと・みる
+むくつけし		①不気味で恐ろしい	
+むげなり	無下なり	①この上なくひどい	
+むすぶ	結ぶ／掬ぶ	①生じる ②手で（水などを）すくう	②は【掬ぶ】
+むつかし	難し	①面倒で嫌だ	→うるさし
+むつごと	睦言	①仲睦まじい男女の語らい	「むつぶ」＝交際する
+むなしくなる	空しく成る	①死ぬ	→いたづらになる・つゆときゆ・はかなくなる・みまかる
+むね	宗	①中心・第一	
+むべ［うべ］	宜	①なるほど	「むねむねし」＝しっかりしている／「むべ［うべ］もなく」＝あっけなく
+めざまし	目覚まし	①目が覚めるほど素晴らしい ②目が覚めるほどひどい	
+めす	召す	①「飲む・食ふ・着る・乗る・呼ぶ」の《尊敬語》	
+めづ	愛づ・賞づ	①愛して賞美する	→めでたし
+めづらし	珍し	①新鮮で素晴らしい	→めづ
+めでたし	愛で甚し・賞で甚し	①素晴らしい	→めづ
+めやすし	目安し	①見た目に感じが良い	
+もとすゑ	本末	①和歌の上の句と下の句	
+ものぐるほし	物狂ほし	①気が変になりそうだ	
+ものす	物す	①いる・ある ②…する	
+もどく	擬く	①非難する	→そしる・なんず
+やうやう	漸う	①だんだん・次第に	
+やがて		①すぐに ②そのまま	
+やさし	差し・恥し／優し	①身が細る思いだ ②優美だ ③優しく優れている	→いうなり・みやび
+やすらふ	休らふ	①ためらってぐずぐずする	
+やつす	窶す［窶る］	①目立たない姿に変える	→かしらおろす・かたちをかふ・ちりをいづ・みぐしおろす・やまずみす・よをいとふ
+やまがつ	山賤	①山に住む身分の低い者	
+やまずみす	山住みす	①出家する	→かしらおろす・かたちをかふ・ちりをいづ・ほつしんす・みぐしおろす・よをいとふ［かる・すつ・そむく・のがる］
+やむごとなし	止む事無し	①放っておけない程格別で尊い	
+やる	遣る	①壊す ②（物を）送る ③（人を）遣わす	「…やる」＝近くから遠くに…する／「おもひやる［こころやる］」・おこす
+やをら［やはら］	柔ら	①静かにそっと	
+…やらむ［…にやあらむ］		①…であるだろうか	
+#p.74
+ゆかし（げなり）	行きたし（げなり）・床し（げなり）	①見たい・聞きたい・知りたい	「ゆかしがる」＝見たがる・聞きたがる・知りたがる
+ゆかり	縁	①縁	
+ゆくすゑ［ゆくさき］	行く末［行く先］	①これからの未来	→こしかた［きしかた］
+ゆくりなし	縁無し	①突然だ	→とみなり・にはかなり
+ゆめ（ゆめ）…	努（努）	①少しも【全く・決して】…《打消》	→かけて…・さらに…・たえて…・つやつや…・つゆ…・よに…
+ゆゆし（げなり）	忌忌し（げなり）	①神聖で畏れ多い ②不吉で縁起が悪い ③甚だしい ④とても素晴らしい ⑤とてもひどい	→いみじ
+ゆる	許る	①許される・認められる	「ゆるす」＝許し認める
+ゆゑ	故	①由緒・たしなみ ②原因理由	「ゆゑゆゑし」＝由緒・たしなみのある／→よし
+よ［よのなか］	世［世の中］	①俗世・俗世間 ②男女仲・夫婦仲 ③一生・人生 ④一時代・政治	
+よ	節	①（竹や葦などの）節 ②（竹や葦などの）節と節の間	
+ようい	用意	①用心 ②心遣い	→いそぎ・かまへ・まうけ
+ようせずは	善うせずは	①悪くするならば	
+よがれ	夜離れ	①男性の夜の通いが無くなること	→かる
+よし	良し	①良い ②身分が高い	→あし・よろし・わろし
+よし	由	①由緒・たしなみ ②原因理由 ③手段方法	「よしなし」＝つまらない／→ゆゑ
+よすが	寄すが・因・縁・便・寄す処	①頼りとするところ	
+よそふ	寄そふ・比ふ	①事寄せる・託ける ②例える・準える	→たぐふ
+よに…		①少しも【全く・決して】…《打消》	→かけて…・さらに…・たえて…・つやつや…・つゆ…・ゆめ（ゆめ）…
+よばふ	夜這ふ・呼ばふ・婚ふ	①求婚する	
+よも…じ		①まさか【もはや】…ないだろう	
+よ（も）すがら	夜（も）すがら	①一晩中・夜中	→ひねもす（に）［ひ（も）すがら］
+よろし	宜し	①悪くない	→あし・よし・わろし
+よろづ	万	①いろいろなこと	
+よをいとふ	世を厭ふ	①出家する［なさる］	【離る・捨つ・背く・遁る】／→かしらおろす・かたちをかふ・ちりをいづ・ほつしんす・みぐしおろす・やまずみす
+らうがはし	乱がはし	①乱雑だ ②乱暴だ	
+らうたし		①（主観的に）かわいらしい	→うつくし
+らうらうじ	労労じ	①洗練された	「らうあり」＝洗練されている
+れいの	例の	①いつもの（ように）	「れいならず」＝いつもと違う・病気だ
+れう	料	①そのために予め用意するもの	
+ろんなし	論無し	①言うまでもなくもちろん	
+#p.75
+わく	分く	①区別・理解する	
+わたつみ	海神	①海 ②海の神	
+わたる	渡る	①俗世を生きていく ②移動する	「…わたる」＝時間的にずっと…し続ける・空間的に一面に…し広げる
+わづらふ	煩ふ・患ふ	①悩んで病気になる	→なやむ・おこたる
+わぶ	侘ぶ	①思い悩む	「わびし（げなり）」＝思い悩んでいる
+わりなし	理無し	①道理に合わず筋が通らない ②無理でどうしようもない ③格別に・特別に	→ことわり
+われかひとか	我か人か	①乱心してぼんやりした状態	
+われと		①自分から	
+わろし	悪し	①良くない	→あし・よし・よろし
+ゐざる	居ざる	①座ったまま擦りながら進む・膝行する	
+ゐる	居る／率る	①座っている ②率いる	②は【率る】
+ゑんず［ゑんじ・ゑず］	怨ず	①恨み言を言う	→うらむ
+をかし（げなり）		①興味深い ②趣深い ③滑稽だ	→おもしろし
+をこ［しれもの］	痴・烏滸・尾籠［痴れ者］	①馬鹿	「をこがまし」＝馬鹿らしい
+をさをさ…		①ほとんど【あまり】…《打消》	→いたし・いと
+をさをさし	長長し	①大人っぽい ②思慮分別がありしっかりしている	→おとなし
+をとこで	男手	①男の書く文字・漢字・真名	→をんなで
+をのこ	男子	①男の子・下男 ②男性・殿上人	
+をり	折	①時・季節 ②機会・ちょうど良い頃合い	
+をんなで	女手	①女の書く文字・平仮名・仮名	→をとこで
+…を…み		①…が…なので	</script>
+
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>古文単語547</h1>
+      <span class="src">四 古文単語（１）重要単語　p.58–75</span>
+    </div>
+    <div class="stats">
+      <span>出題 <b id="st-n">0</b> 語</span>
+      <span class="miss">誤答 <b id="st-miss">0</b> 回</span>
+      <span>要復習 <b id="st-words">0</b> 語</span>
+    </div>
+    <div class="controls">
+      <select id="range" aria-label="範囲"></select>
+      <select id="filter" aria-label="出題範囲">
+        <option value="all">全部</option>
+        <option value="missed">間違えた語だけ</option>
+        <option value="unseen">まだ見てない語</option>
+      </select>
+      <select id="order" aria-label="並び順">
+        <option value="seq">番号順</option>
+        <option value="shuffle">シャッフル</option>
+        <option value="worst">誤答の多い順</option>
+      </select>
+      <span class="seg">
+        <button id="tab-card" aria-pressed="true">カード</button>
+        <button id="tab-list" aria-pressed="false">一覧</button>
+      </span>
+    </div>
+  </header>
+
+  <section id="view-card" class="stage">
+    <div class="card" id="card" role="button" tabindex="0" aria-live="polite">
+      <div class="face">
+        <span class="no" id="c-no"></span>
+        <span class="page" id="c-page"></span>
+        <p class="word" id="c-word"></p>
+        <p class="hint" id="c-hint">タップで漢字と訳</p>
+      </div>
+      <div class="back" id="c-back" hidden>
+        <p class="kanji" id="c-kanji"></p>
+        <ul class="senses" id="c-senses"></ul>
+        <p class="note" id="c-note" hidden></p>
+      </div>
+      <span class="badge" id="c-badge" hidden></span>
+    </div>
+
+    <div class="actions">
+      <button class="act nav" id="prev" aria-label="前の語">‹</button>
+      <button class="act miss" id="miss">✕ 間違えた</button>
+      <button class="act ok" id="ok">○ 覚えた</button>
+      <button class="act nav" id="next" aria-label="次の語">›</button>
+    </div>
+
+    <div class="subrow">
+      <span id="pos"></span>
+      <span>
+        <button class="linkbtn" id="reset-one">この語の回数を0に</button>
+        ・
+        <button class="linkbtn" id="reset-all">全部リセット</button>
+      </span>
+    </div>
+  </section>
+
+  <section id="view-list" class="listwrap" hidden>
+    <div class="tscroll">
+      <table>
+        <thead><tr><th>No.</th><th>古文単語</th><th>漢字</th><th>訳</th><th>誤答</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="list-empty" hidden>該当する語がない。</div>
+  </section>
+
+  <footer>
+    訳が複数ある語は、めくった先で意味ごとに ✕ を押せる。下の「✕ 間違えた」は語全体の記録。<br>
+    誤答回数はこの端末のブラウザに保存される。キーボード：Space＝めくる／←→＝移動／X＝間違えた／O＝覚えた／1–9＝その意味を間違えた。
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY="koten.miss.v2", SKEY="koten.seen.v2";
+  var MARKS="①②③④⑤⑥⑦⑧⑨⑩";
+
+  var WORDS=[], group="", used={};
+  document.getElementById("src").textContent.split("\n").forEach(function(line){
+    if(!line.trim()) return;
+    if(line.charAt(0)==="#"){ group=line.slice(1).trim(); return; }
+    var p=line.split("\t");
+    var w={i:WORDS.length+1,w:p[0]||"",k:p[1]||"",m:p[2]||"",note:p[3]||"",g:group};
+    // storage id: independent of numbering, disambiguated when 見出し+漢字 repeat
+    var base=w.w+"|"+w.k;
+    used[base]=(used[base]||0)+1;
+    w.id=used[base]>1?base+"~"+used[base]:base;
+    w.s=splitSenses(w.m);
+    WORDS.push(w);
+  });
+
+  function splitSenses(m){
+    if(!m.trim()) return [];
+    var out=[],cur=null;
+    m.split("").forEach(function(ch){
+      if(MARKS.indexOf(ch)>=0){ cur={mk:ch,txt:""}; out.push(cur); }
+      else if(cur){ cur.txt+=ch; }
+      else { cur={mk:"",txt:ch}; out.push(cur); }
+    });
+    out.forEach(function(s){ s.txt=s.txt.trim(); });
+    return out;
+  }
+
+  var groups=[]; WORDS.forEach(function(x){ if(groups.indexOf(x.g)<0) groups.push(x.g); });
+
+  function load(k){ try{ return JSON.parse(localStorage.getItem(k))||{}; }catch(e){ return {}; } }
+  function save(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} }
+  var miss=load(KEY), seen=load(SKEY);
+
+  var el=function(id){ return document.getElementById(id); };
+  var rangeSel=el("range"), filterSel=el("filter"), orderSel=el("order");
+  var allOpt=document.createElement("option"); allOpt.value="all"; allOpt.textContent="全範囲";
+  rangeSel.appendChild(allOpt);
+  groups.forEach(function(g,n){
+    var o=document.createElement("option"); o.value=String(n); o.textContent=g; rangeSel.appendChild(o);
+  });
+  rangeSel.value="all";
+
+  var deck=[], idx=0, flipped=false;
+
+  function wordMiss(w){ return miss[w.id]||0; }
+  function senseMiss(w,i){ return miss[w.id+"#"+i]||0; }
+  function totalMiss(w){
+    var t=wordMiss(w);
+    for(var i=0;i<w.s.length;i++) t+=senseMiss(w,i);
+    return t;
+  }
+  function bump(key){
+    miss[key]=(miss[key]||0)+1; save(KEY,miss);
+  }
+  function clearWord(w){
+    delete miss[w.id];
+    for(var i=0;i<w.s.length;i++) delete miss[w.id+"#"+i];
+    save(KEY,miss);
+  }
+  function markSeen(w){ seen[w.id]=1; save(SKEY,seen); }
+
+  function build(){
+    var g=rangeSel.value, f=filterSel.value, o=orderSel.value;
+    var list=WORDS.filter(function(w){
+      if(g!=="all" && w.g!==groups[Number(g)]) return false;
+      if(f==="missed" && totalMiss(w)===0) return false;
+      if(f==="unseen" && seen[w.id]) return false;
+      return true;
+    });
+    if(o==="worst") list.sort(function(a,b){ return totalMiss(b)-totalMiss(a) || a.i-b.i; });
+    else if(o==="shuffle"){
+      for(var i=list.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=list[i]; list[i]=list[j]; list[j]=t; }
+    }
+    deck=list; if(idx>=deck.length) idx=0;
+  }
+
+  function stats(){
+    var totalCount=0, words={};
+    Object.keys(miss).forEach(function(k){
+      totalCount+=miss[k];
+      words[k.split("#")[0]]=1;
+    });
+    el("st-n").textContent=deck.length;
+    el("st-miss").textContent=totalCount;
+    el("st-words").textContent=Object.keys(words).length;
+  }
+
+  function esc(s){ return String(s).replace(/[&<>"]/g,function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  function renderSenses(w){
+    var ul=el("c-senses"); ul.textContent="";
+    w.s.forEach(function(s,i){
+      var n=senseMiss(w,i);
+      var li=document.createElement("li");
+      li.innerHTML=(s.mk?'<span class="mk">'+esc(s.mk)+'</span>':'')+
+        '<span class="txt">'+esc(s.txt)+'</span>';
+      var b=document.createElement("button");
+      b.type="button";
+      b.className="sx"+(n?" on":"");
+      b.textContent=n?"✕ "+n:"✕";
+      b.title=(s.mk||"この意味")+"を間違えた";
+      b.setAttribute("aria-label",(s.mk||"この意味")+"を間違えた（現在 "+n+" 回）");
+      b.addEventListener("click",function(ev){
+        ev.stopPropagation();
+        bump(w.id+"#"+i); markSeen(w); render(); renderList();
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  function render(){
+    stats();
+    var card=el("card");
+    if(!deck.length){
+      el("c-no").textContent=""; el("c-page").textContent="";
+      el("c-word").textContent="該当なし";
+      el("c-hint").hidden=false; el("c-hint").textContent="範囲か絞り込みを変えて";
+      el("c-back").hidden=true; el("c-badge").hidden=true;
+      card.classList.remove("missed");
+      el("pos").textContent="";
+      el("miss").disabled=el("ok").disabled=el("prev").disabled=el("next").disabled=true;
+      return;
+    }
+    el("miss").disabled=el("ok").disabled=false;
+    el("prev").disabled=el("next").disabled=deck.length<2;
+    var w=deck[idx], n=totalMiss(w);
+    el("c-no").textContent=String(w.i).padStart(3,"0");
+    el("c-page").textContent=w.g;
+    el("c-word").textContent=w.w;
+    el("c-hint").hidden=flipped;
+    el("c-back").hidden=!flipped;
+    el("c-kanji").innerHTML = w.k
+      ? '<span class="brk">【</span>'+esc(w.k)+'<span class="brk">】</span>'
+      : '<span class="brk">漢字表記なし</span>';
+    if(flipped) renderSenses(w);
+    el("c-note").hidden=!w.note;
+    el("c-note").textContent=w.note;
+    el("c-badge").hidden=n===0;
+    el("c-badge").textContent="✕ "+n;
+    card.classList.toggle("missed",n>0);
+    el("pos").textContent=(idx+1)+" / "+deck.length;
+  }
+
+  function flip(){ if(!deck.length) return; flipped=!flipped; if(flipped) markSeen(deck[idx]); render(); }
+  function go(d){
+    if(!deck.length) return;
+    idx=(idx+d+deck.length)%deck.length; flipped=false; render();
+  }
+
+  el("card").addEventListener("click",flip);
+  el("card").addEventListener("keydown",function(e){
+    if(e.key===" "||e.key==="Enter"){ e.preventDefault(); flip(); }
+  });
+  el("prev").addEventListener("click",function(){ go(-1); });
+  el("next").addEventListener("click",function(){ go(1); });
+  el("miss").addEventListener("click",function(){
+    if(!deck.length) return;
+    var w=deck[idx]; bump(w.id); markSeen(w); flipped=false;
+    if(filterSel.value==="unseen"){ build(); render(); } else go(1);
+    renderList();
+  });
+  el("ok").addEventListener("click",function(){
+    if(!deck.length) return;
+    markSeen(deck[idx]);
+    if(filterSel.value==="unseen"){ build(); if(idx>=deck.length) idx=0; flipped=false; render(); }
+    else go(1);
+  });
+  el("reset-one").addEventListener("click",function(){
+    if(!deck.length) return; clearWord(deck[idx]); render(); renderList();
+  });
+  el("reset-all").addEventListener("click",function(){
+    if(!confirm("誤答回数と学習状況を全部消す。いい？")) return;
+    miss={}; seen={}; save(KEY,miss); save(SKEY,seen); build(); render(); renderList();
+  });
+  [rangeSel,filterSel,orderSel].forEach(function(s){
+    s.addEventListener("change",function(){ idx=0; flipped=false; build(); render(); renderList(); });
+  });
+
+  var tabCard=el("tab-card"), tabList=el("tab-list");
+  function setTab(isCard){
+    tabCard.setAttribute("aria-pressed",String(isCard));
+    tabList.setAttribute("aria-pressed",String(!isCard));
+    el("view-card").hidden=!isCard;
+    el("view-list").hidden=isCard;
+    if(!isCard) renderList();
+  }
+  tabCard.addEventListener("click",function(){ setTab(true); });
+  tabList.addEventListener("click",function(){ setTab(false); });
+
+  function renderList(){
+    if(el("view-list").hidden) return;
+    var tb=el("tbody"); tb.textContent="";
+    deck.forEach(function(w){
+      var n=totalMiss(w), parts=[];
+      w.s.forEach(function(s,i){ var c=senseMiss(w,i); if(c) parts.push((s.mk||"—")+c); });
+      var tr=document.createElement("tr");
+      tr.innerHTML='<td class="n">'+String(w.i).padStart(3,"0")+'</td>'+
+        '<td class="w">'+esc(w.w)+'</td>'+
+        '<td class="m">'+esc(w.k||"—")+'</td>'+
+        '<td class="m">'+esc(w.m)+'</td>'+
+        '<td class="x">'+(n?'<b>✕ '+n+'</b>'+(parts.length?'<span class="brk">'+esc(parts.join(" "))+'</span>':'')
+                          :'<span style="color:var(--faint)">–</span>')+'</td>';
+      tb.appendChild(tr);
+    });
+    el("list-empty").hidden=deck.length>0;
+  }
+
+  document.addEventListener("keydown",function(e){
+    if(e.target.tagName==="SELECT") return;
+    if(e.target===el("card")) return;
+    var k=e.key.toLowerCase();
+    if(k===" "||e.key==="Enter"){ e.preventDefault(); flip(); }
+    else if(e.key==="ArrowRight"){ go(1); }
+    else if(e.key==="ArrowLeft"){ go(-1); }
+    else if(k==="x"){ el("miss").click(); }
+    else if(k==="o"){ el("ok").click(); }
+    else if(/^[1-9]$/.test(e.key) && flipped && deck.length){
+      var w=deck[idx], i=Number(e.key)-1;
+      if(i<w.s.length){ bump(w.id+"#"+i); markSeen(w); render(); renderList(); }
+    }
+  });
+
+  build(); render();
+})();
+</script>
