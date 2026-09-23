@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>星間戦線</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --void: #070b16;
+  --deck: #0d1424;
+  --panel: #111a2e;
+  --line: #1e2a44;
+  --line-strong: #2d3d60;
+  --ink: #dbe4f5;
+  --muted: #7f8db0;
+  --blue: #4ea2ff;
+  --blue-dim: rgba(78, 162, 255, .16);
+  --blue-camp: rgba(78, 162, 255, .10);
+  --red: #ff5c63;
+  --red-dim: rgba(255, 92, 99, .16);
+  --red-camp: rgba(255, 92, 99, .10);
+  --gold: #ffd166;
+  --label: 18px;
+  --cell: clamp(14px, calc((100vw - 40px - 2 * var(--label)) / 20), 30px);
+  --f-display: "Chakra Petch", "Noto Sans JP", system-ui, sans-serif;
+  --f-body: "Noto Sans JP", system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(1px 1px at 12% 18%, #ffffff55 50%, transparent 51%),
+    radial-gradient(1px 1px at 72% 8%, #ffffff44 50%, transparent 51%),
+    radial-gradient(1px 1px at 88% 62%, #ffffff33 50%, transparent 51%),
+    radial-gradient(1px 1px at 34% 82%, #ffffff44 50%, transparent 51%),
+    radial-gradient(1200px 700px at 50% 40%, #101c38 0%, var(--void) 70%) fixed,
+    var(--void);
+  color: var(--ink);
+  font: 14px/1.6 var(--f-body);
+  padding: 16px;
+}
+button, input, select { font: inherit; color: inherit; }
+button {
+  cursor: pointer;
+  border: 1px solid var(--line-strong);
+  background: var(--deck);
+  color: var(--ink);
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  letter-spacing: .04em;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .35; cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.app { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
+
+/* ---------- header ---------- */
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { margin: 0; font: 700 26px/1 var(--f-display); letter-spacing: .12em; }
+.brand span { font: 500 11px var(--f-display); color: var(--muted); letter-spacing: .3em; text-transform: uppercase; }
+.phases { display: flex; flex-wrap: wrap; gap: 4px; list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.phases li {
+  padding: 3px 9px; border: 1px solid var(--line); border-radius: 3px; color: var(--muted);
+  font-family: var(--f-display); letter-spacing: .03em;
+}
+.phases li.on.blue { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
+.phases li.on.red { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+.turnno { font: 600 13px var(--f-mono); color: var(--muted); }
+.turnno b { color: var(--ink); font-size: 18px; }
+
+/* ---------- layout ---------- */
+.layout { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) {
+  .layout { grid-template-columns: auto minmax(260px, 1fr); align-items: start; }
+}
+.table { display: grid; gap: 10px; justify-items: center; }
+
+/* ---------- command strips ---------- */
+.cmd {
+  width: 100%; max-width: calc(var(--label) * 2 + var(--cell) * 20);
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: center;
+  padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+  transition: border-color .2s, box-shadow .2s;
+}
+.cmd.flip { transform: rotate(180deg); }
+.cmd .who { font: 700 13px var(--f-display); letter-spacing: .12em; }
+.cmd.blue .who { color: var(--blue); }
+.cmd.red .who { color: var(--red); }
+.cmd .state { font-size: 12px; color: var(--muted); margin-left: 8px; font-family: var(--f-body); letter-spacing: 0; font-weight: 400; }
+.cmd.active.blue { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue-dim), 0 0 24px var(--blue-dim); }
+.cmd.active.red { border-color: var(--red); box-shadow: 0 0 0 1px var(--red-dim), 0 0 24px var(--red-dim); }
+.cmd .acts { display: flex; gap: 6px; grid-row: span 2; }
+.cmd .acts .end.blue:not(:disabled) { background: var(--blue); border-color: var(--blue); color: #04101f; }
+.cmd .acts .end.red:not(:disabled) { background: var(--red); border-color: var(--red); color: #1f0406; }
+.ap { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.pips { display: flex; gap: 2px; flex-wrap: wrap; }
+.pip { width: 8px; height: 10px; border-radius: 1px; background: var(--line); }
+.cmd.blue .pip.full { background: var(--blue); }
+.cmd.red .pip.full { background: var(--red); }
+.ap b { font: 600 13px var(--f-mono); color: var(--ink); }
+.fleet { font: 400 12px var(--f-mono); color: var(--muted); }
+
+/* ---------- board ---------- */
+.board-wrap { position: relative; max-width: 100%; }
+.board {
+  display: grid;
+  grid-template-columns: var(--label) repeat(20, var(--cell)) var(--label);
+  grid-template-rows: var(--label) repeat(20, var(--cell)) var(--label);
+  user-select: none; -webkit-user-select: none;
+}
+.lbl {
+  display: grid; place-items: center; font: 400 9px var(--f-mono); color: var(--muted);
+}
+.cell {
+  position: relative; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: var(--deck);
+}
+.cell.c0 { border-left: 1px solid var(--line-strong); }
+.cell.r0 { border-top: 1px solid var(--line-strong); }
+.cell.c19 { border-right-color: var(--line-strong); }
+.cell.r19 { border-bottom-color: var(--line-strong); }
+.cell.camp-red { background: linear-gradient(var(--red-camp), var(--red-camp)), var(--deck); }
+.cell.camp-blue { background: linear-gradient(var(--blue-camp), var(--blue-camp)), var(--deck); }
+.cell.reach { cursor: pointer; }
+.cell.reach.blue::after, .cell.reach.red::after {
+  content: ""; position: absolute; inset: 28%; border-radius: 50%;
+}
+.cell.reach.blue::after { background: var(--blue); opacity: .45; }
+.cell.reach.red::after { background: var(--red); opacity: .45; }
+.cell.reach:hover::after { inset: 18%; opacity: .8; }
+.cell.rng.blue { box-shadow: inset 0 0 0 999px var(--blue-dim); }
+.cell.rng.red { box-shadow: inset 0 0 0 999px var(--red-dim); }
+.cell.own { cursor: pointer; }
+.piece { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .2s; }
+.piece.moved { opacity: .42; }
+.cell.sel { outline: 2px solid var(--gold); outline-offset: -2px; z-index: 1; }
+.cell.firing .piece { filter: drop-shadow(0 0 4px var(--gold)); }
+.fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.fx line { stroke-width: 2; stroke-linecap: round; animation: beam .55s ease-out forwards; }
+.fx circle.boom { animation: boom .6s ease-out forwards; }
+@keyframes beam { 0% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes boom { 0% { r: 2; opacity: 1; } 100% { r: 22; opacity: 0; } }
+.float {
+  position: absolute; pointer-events: none; transform: translate(-50%, -50%);
+  font: 700 11px var(--f-mono); text-shadow: 0 1px 2px #000, 0 0 4px #000;
+  animation: rise .9s ease-out forwards; white-space: nowrap;
+}
+.float.miss { color: var(--muted); font-weight: 400; }
+.float.hit { color: var(--gold); }
+.float.kill { color: #fff; }
+@keyframes rise { from { opacity: 1; margin-top: 0; } to { opacity: 0; margin-top: -18px; } }
+
+/* ---------- sidebar ---------- */
+.side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.box h2 { margin: 0 0 8px; font: 700 12px var(--f-display); letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+.inspect { min-height: 64px; font-size: 13px; }
+.inspect .nm { font-weight: 700; }
+.inspect .nm.blue { color: var(--blue); }
+.inspect .nm.red { color: var(--red); }
+.inspect .kv { font: 400 12px var(--f-mono); color: var(--muted); }
+.stats { overflow-x: auto; }
+.stats table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.stats th, .stats td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.stats th:first-child, .stats td:first-child { text-align: left; }
+.stats thead th { color: var(--muted); font-weight: 500; font-family: var(--f-mono); }
+.stats td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.stats td:first-child { font-family: var(--f-body); }
+.formula { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.formula code { font-family: var(--f-mono); color: var(--ink); }
+.settings { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; font-size: 13px; }
+.settings input[type=number], .settings select {
+  background: var(--deck); border: 1px solid var(--line-strong); border-radius: 4px; padding: 4px 6px; width: 100%;
+}
+.settings .row-btn { grid-column: 1 / -1; display: flex; gap: 8px; }
+.settings label.chk { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 280px; overflow-y: auto; font: 400 11px/1.55 var(--f-mono); }
+.log li { padding: 2px 0; border-bottom: 1px dashed var(--line); color: var(--muted); }
+.log li.h { color: var(--ink); font-weight: 600; border-bottom-style: solid; padding-top: 6px; }
+.log .b { color: var(--blue); }
+.log .r { color: var(--red); }
+.log .k { color: var(--gold); font-weight: 600; }
+
+/* ---------- result overlay ---------- */
+.result {
+  position: fixed; inset: 0; display: grid; place-items: center; background: rgba(4, 7, 14, .78);
+  padding: 16px; z-index: 10;
+}
+.result .card { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; padding: 24px 28px; text-align: center; max-width: 360px; }
+.result h2 { margin: 0 0 6px; font: 700 28px var(--f-display); letter-spacing: .1em; }
+.result p { margin: 0 0 16px; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx line, .fx circle.boom, .float { animation-duration: .01s; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>星間戦線</h1><span>Stellar Front · 20×20</span></div>
+    <ol class="phases" id="phases">
+      <li class="blue" data-p="blue">① 青 移動</li>
+      <li class="red" data-p="red">② 赤 移動</li>
+      <li class="red" data-p="fire-red">③ 赤 攻撃</li>
+      <li class="blue" data-p="fire-blue">④ 青 攻撃</li>
+    </ol>
+    <div class="turnno">TURN <b id="turn">1</b></div>
+  </header>
+
+  <div class="layout">
+    <section class="table" aria-label="戦場">
+      <div class="cmd red" id="cmd-red"></div>
+      <div class="board-wrap">
+        <div class="board" id="board"></div>
+        <svg class="fx" id="fx"></svg>
+      </div>
+      <div class="cmd blue" id="cmd-blue"></div>
+    </section>
+
+    <aside class="side">
+      <div class="box">
+        <h2>Scan</h2>
+        <div class="inspect" id="inspect"><span class="kv">コマにカーソルを合わせると詳細を表示</span></div>
+      </div>
+      <div class="box stats">
+        <h2>艦種データ</h2>
+        <table>
+          <thead><tr><th></th><th>移動</th><th>m</th><th>射程</th><th>a</th><th>e</th><th>b 平均±σ</th><th>d</th><th>c</th></tr></thead>
+          <tbody>
+            <tr><td>● 攻撃機</td><td>5×5</td><td>1</td><td>3×3</td><td>10</td><td>100</td><td>0.75±0.25</td><td>50</td><td>10</td></tr>
+            <tr><td>▲ 巡察艇</td><td>3×3</td><td>2</td><td>5×5</td><td>20</td><td>90</td><td>0.50±0.25</td><td>40</td><td>30</td></tr>
+          </tbody>
+        </table>
+        <p class="formula">命中率 <code>(e − d) / 100</code> ・ 命中時 <code>c ← c − a × b</code> ・ <code>c &lt; 0</code> で撃沈</p>
+      </div>
+      <div class="box">
+        <h2>設定</h2>
+        <div class="settings">
+          <label for="opt-n">行動力 n</label>
+          <input id="opt-n" type="number" min="1" max="40" value="10">
+          <label for="opt-speed">戦闘演出</label>
+          <select id="opt-speed">
+            <option value="1">通常</option>
+            <option value="0.4">高速</option>
+            <option value="0">省略</option>
+          </select>
+          <label class="chk"><input id="opt-flip" type="checkbox" checked> 対面モード（赤の操作パネルを反転）</label>
+          <div class="row-btn">
+            <button id="btn-new" type="button">新しいゲーム</button>
+            <button id="btn-skip" type="button" disabled>演出をスキップ</button>
+          </div>
+        </div>
+      </div>
+      <div class="box">
+        <h2>戦闘ログ</h2>
+        <ul class="log" id="log"></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="result" id="result" hidden>
+  <div class="card">
+    <h2 id="result-title"></h2>
+    <p id="result-sub"></p>
+    <button id="btn-again" type="button">もう一度</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ===================== ルール定義 =====================
+const W = 20, H = 20;
+const COLS = 'ABCDEFGHIJKLMNOPQRST';
+
+// move: 移動できる近隣マスの半径 (2 → 5×5, 1 → 3×3)
+// range: 攻撃が届く近隣マスの半径 (1 → 3×3, 2 → 5×5)
+const TYPES = {
+  fighter: { name: '攻撃機', move: 2, m: 1, range: 1, a: 10, e: 100, bMean: 0.75, bSd: 0.25, d: 50, c: 10 },
+  patrol:  { name: '巡察艇', move: 1, m: 2, range: 2, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30 },
+};
+
+const SIDES = {
+  blue: { player: 'PLAYER 1', jp: '青', camp: H - 1, enemy: 'red' },
+  red:  { player: 'PLAYER 2', jp: '赤', camp: 0,     enemy: 'blue' },
+};
+
+// 各プレイヤーから見た巡察艇の列（赤は左右反転して対称に配置）
+const PATROL_COLS = [2, 6, 10, 14, 18];
+
+// ===================== 状態 =====================
+let S = null;
+let skip = false;
+
+function newGame(n) {
+  const pieces = [];
+  let id = 0;
+  for (const side of ['blue', 'red']) {
+    const y = SIDES[side].camp;
+    for (let x = 0; x < W; x++) {
+      const viewCol = side === 'blue' ? x : W - 1 - x;
+      const type = PATROL_COLS.includes(viewCol) ? 'patrol' : 'fighter';
+      pieces.push({ id: id++, side, type, x, y, hp: TYPES[type].c, moved: false });
+    }
+  }
+  S = { n, turn: 1, phase: 'blue', ap: n, pieces, sel: null, hover: null, history: [], busy: false };
+  skip = false;
+  logEl.innerHTML = '';
+  addLog(`<span class="h">TURN 1 ― 青の移動</span>`, true);
+  resultEl.hidden = true;
+  render();
+}
+
+const pieceAt = (x, y) => S.pieces.find(p => p.x === x && p.y === y);
+const cheb = (a, b) => Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+const coord = p => `${COLS[p.x]}${p.y + 1}`;
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+function gauss(mean, sd) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+function reachable(p) {
+  const t = TYPES[p.type];
+  if (S.busy || S.phase !== p.side || p.moved || S.ap < t.m) return [];
+  const enemyCamp = SIDES[SIDES[p.side].enemy].camp;
+  const out = [];
+  for (let dy = -t.move; dy <= t.move; dy++) {
+    for (let dx = -t.move; dx <= t.move; dx++) {
+      const x = p.x + dx, y = p.y + dy;
+      if ((dx === 0 && dy === 0) || x < 0 || y < 0 || x >= W || y >= H) continue;
+      if (y === enemyCamp) continue;           // 敵陣地には侵入不可
+      if (pieceAt(x, y)) continue;             // 重ねられない
+      out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+function movePiece(p, x, y) {
+  S.history.push({ id: p.id, x: p.x, y: p.y });
+  p.x = x; p.y = y; p.moved = true;
+  S.ap -= TYPES[p.type].m;
+  S.sel = null; S.hover = null;
+  render();
+}
+
+function undo() {
+  const h = S.history.pop();
+  if (!h) return;
+  const p = S.pieces.find(q => q.id === h.id);
+  p.x = h.x; p.y = h.y; p.moved = false;
+  S.ap += TYPES[p.type].m;
+  S.sel = null;
+  render();
+}
+
+function endMove() {
+  if (S.busy) return;
+  S.sel = null; S.hover = null; S.history = [];
+  if (S.phase === 'blue') {
+    S.phase = 'red';
+    S.ap = S.n;
+    S.pieces.forEach(p => { p.moved = false; });
+    addLog(`<span class="h">TURN ${S.turn} ― 赤の移動</span>`, true);
+    render();
+  } else if (S.phase === 'red') {
+    combat();
+  }
+}
+
+// ===================== 戦闘 =====================
+const wait = ms => new Promise(r => setTimeout(r, ms));
+const speed = () => Number(speedSel.value);
+
+async function combat() {
+  S.busy = true;
+  skipBtn.disabled = speed() === 0;
+  for (const side of ['red', 'blue']) {
+    S.phase = 'fire-' + side;
+    addLog(`<span class="h">TURN ${S.turn} ― ${SIDES[side].jp}の攻撃</span>`, true);
+    render();
+    await firePhase(side);
+    render();
+    if (checkWin()) { S.busy = false; skipBtn.disabled = true; return; }
+  }
+  S.turn++;
+  S.phase = 'blue';
+  S.ap = S.n;
+  S.pieces.forEach(p => { p.moved = false; });
+  S.busy = false;
+  skip = false;
+  skipBtn.disabled = true;
+  addLog(`<span class="h">TURN ${S.turn} ― 青の移動</span>`, true);
+  render();
+}
+
+async function firePhase(side) {
+  const attackers = S.pieces.filter(p => p.side === side).sort((a, b) => a.id - b.id);
+  const cls = side === 'blue' ? 'b' : 'r';
+  const ecls = side === 'blue' ? 'r' : 'b';
+  for (const atk of attackers) {
+    if (!S.pieces.includes(atk)) continue;
+    const t = TYPES[atk.type];
+    const targets = S.pieces.filter(q => q.side !== side && cheb(atk, q) <= t.range);
+    if (!targets.length) continue;
+
+    const results = targets.map(q => {
+      const qt = TYPES[q.type];
+      const pHit = clamp((t.e - qt.d) / 100, 0, 1);
+      const hit = Math.random() < pHit;
+      let b = null, dmg = 0;
+      if (hit) {
+        // 防御力 b は被攻撃ごとに正規分布で変動（負値は 0 に丸める）
+        b = Math.max(0, gauss(qt.bMean, qt.bSd));
+        dmg = t.a * b;
+        q.hp -= dmg;
+      }
+      return { q, hit, b, dmg, pHit, killed: q.hp < 0 };
+    });
+
+    for (const r of results) {
+      const qt = TYPES[r.q.type];
+      const head = `<span class="${cls}">${t.name}${coord(atk)}</span>→<span class="${ecls}">${qt.name}${coord(r.q)}</span>`;
+      if (!r.hit) addLog(`${head} 回避 (命中率${Math.round(r.pHit * 100)}%)`);
+      else addLog(`${head} 命中 b=${r.b.toFixed(2)} −${r.dmg.toFixed(1)} → c=${r.q.hp.toFixed(1)}` +
+        (r.killed ? ' <span class="k">撃沈</span>' : ''));
+    }
+
+    const sp = skip ? 0 : speed();
+    if (sp > 0) {
+      showFire(atk, results);
+      render();
+    }
+    S.pieces = S.pieces.filter(p => !results.some(r => r.killed && r.q === p));
+    if (sp > 0) {
+      await wait(420 * sp);
+      render();
+    }
+  }
+}
+
+function checkWin() {
+  const blue = S.pieces.some(p => p.side === 'blue');
+  const red = S.pieces.some(p => p.side === 'red');
+  if (blue && red) return false;
+  S.phase = 'over';
+  render();
+  const title = document.getElementById('result-title');
+  const sub = document.getElementById('result-sub');
+  if (!blue && !red) { title.textContent = '相討ち'; title.style.color = 'var(--gold)'; sub.textContent = '両艦隊とも全滅しました。'; }
+  else {
+    const w = blue ? 'blue' : 'red';
+    title.textContent = `${SIDES[w].player} 勝利`;
+    title.style.color = `var(--${w})`;
+    sub.textContent = `${SIDES[w].jp}艦隊が ${S.turn} ターンで敵艦隊を全滅させました。`;
+  }
+  addLog(`<span class="k">${title.textContent}</span>`, true);
+  resultEl.hidden = false;
+  return true;
+}
+
+// ===================== 描画 =====================
+const boardEl = document.getElementById('board');
+const fxEl = document.getElementById('fx');
+const wrapEl = boardEl.parentElement;
+const logEl = document.getElementById('log');
+const resultEl = document.getElementById('result');
+const speedSel = document.getElementById('opt-speed');
+const skipBtn = document.getElementById('btn-skip');
+const inspectEl = document.getElementById('inspect');
+const cells = [];
+
+function buildBoard() {
+  const lbl = t => { const d = document.createElement('div'); d.className = 'lbl'; d.textContent = t; return d; };
+  const colRow = () => { boardEl.appendChild(lbl('')); for (let x = 0; x < W; x++) boardEl.appendChild(lbl(COLS[x])); boardEl.appendChild(lbl('')); };
+  colRow();
+  for (let y = 0; y < H; y++) {
+    boardEl.appendChild(lbl(y + 1));
+    cells[y] = [];
+    for (let x = 0; x < W; x++) {
+      const c = document.createElement('div');
+      c.className = 'cell';
+      c.dataset.x = x; c.dataset.y = y;
+      cells[y][x] = c;
+      boardEl.appendChild(c);
+    }
+    boardEl.appendChild(lbl(y + 1));
+  }
+  colRow();
+}
+
+function pieceSVG(p) {
+  const t = TYPES[p.type];
+  const col = `var(--${p.side})`;
+  const hpw = 14 * clamp(p.hp / t.c, 0, 1);
+  let shape;
+  if (p.type === 'fighter') shape = `<circle cx="10" cy="9" r="4.2" fill="${col}"/>`;
+  else shape = p.side === 'blue'
+    ? `<polygon points="10,2.5 16.5,14 3.5,14" fill="${col}"/>`
+    : `<polygon points="10,15.5 16.5,4 3.5,4" fill="${col}"/>`;
+  const barY = p.side === 'blue' ? 16.4 : 16.4;
+  return `<svg class="piece${p.moved ? ' moved' : ''}" viewBox="0 0 20 20" aria-hidden="true">${shape}` +
+    `<rect x="3" y="${barY}" width="14" height="1.6" fill="#ffffff22"/>` +
+    `<rect x="3" y="${barY}" width="${hpw.toFixed(2)}" height="1.6" fill="${col}"/></svg>`;
+}
+
+function render() {
+  const sel = S.sel != null ? S.pieces.find(p => p.id === S.sel) : null;
+  const reach = sel ? reachable(sel) : [];
+  const reachSet = new Set(reach.map(r => r.y * W + r.x));
+  const rngFrom = sel ? (S.hover && reachSet.has(S.hover.y * W + S.hover.x) ? S.hover : sel) : null;
+  const rngR = sel ? TYPES[sel.type].range : 0;
+
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const c = cells[y][x];
+    const cl = ['cell', 'c' + x, 'r' + y];
+    if (y === SIDES.red.camp) cl.push('camp-red');
+    if (y === SIDES.blue.camp) cl.push('camp-blue');
+    const p = pieceAt(x, y);
+    if (p && !S.busy && p.side === S.phase) cl.push('own');
+    if (sel && sel.x === x && sel.y === y) cl.push('sel');
+    if (reachSet.has(y * W + x)) cl.push('reach', sel.side);
+    if (rngFrom && Math.max(Math.abs(rngFrom.x - x), Math.abs(rngFrom.y - y)) <= rngR) cl.push('rng', sel.side);
+    c.className = cl.join(' ');
+    const html = p ? pieceSVG(p) : '';
+    if (c._html !== html) { c.innerHTML = html; c._html = html; }
+  }
+
+  document.getElementById('turn').textContent = S.turn;
+  document.querySelectorAll('#phases li').forEach(li => li.classList.toggle('on', li.dataset.p === S.phase));
+  renderCmd('blue');
+  renderCmd('red');
+}
+
+function renderCmd(side) {
+  const el = document.getElementById('cmd-' + side);
+  const active = S.phase === side && !S.busy;
+  const firing = S.phase === 'fire-' + side;
+  el.classList.toggle('active', active || firing);
+  const mine = S.pieces.filter(p => p.side === side);
+  const nf = mine.filter(p => p.type === 'fighter').length;
+  const np = mine.filter(p => p.type === 'patrol').length;
+  const state = active ? '移動フェーズ' : firing ? '自動攻撃中' : S.phase === 'over' ? '終了' : '待機中';
+  const ap = active ? S.ap : (S.phase === side ? S.ap : S.n);
+  let pips = '';
+  for (let i = 0; i < S.n; i++) pips += `<span class="pip${i < ap ? ' full' : ''}"></span>`;
+  el.innerHTML =
+    `<div class="who">${SIDES[side].player} · ${SIDES[side].jp}<span class="state">${state}</span></div>` +
+    `<div class="acts"><button type="button" data-act="undo" ${active && S.history.length ? '' : 'disabled'}>取り消し</button>` +
+    `<button type="button" class="end ${side}" data-act="end" ${active ? '' : 'disabled'}>${side === 'blue' ? '移動終了' : '移動終了 → 戦闘'}</button></div>` +
+    `<div class="ap">行動力 n <div class="pips">${pips}</div><b>${ap}/${S.n}</b>` +
+    `<span class="fleet">● ${nf}　▲ ${np}</span></div>`;
+}
+
+function cellCenter(x, y) {
+  const wr = wrapEl.getBoundingClientRect();
+  const r = cells[y][x].getBoundingClientRect();
+  return { x: r.left - wr.left + r.width / 2, y: r.top - wr.top + r.height / 2 };
+}
+
+function showFire(atk, results) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const a = cellCenter(atk.x, atk.y);
+  cells[atk.y][atk.x].classList.add('firing');
+  const color = getComputedStyle(document.documentElement).getPropertyValue('--' + atk.side).trim();
+  for (const r of results) {
+    const b = cellCenter(r.q.x, r.q.y);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', a.x); line.setAttribute('y1', a.y);
+    // 回避時はわずかに逸れた弾道
+    const jx = r.hit ? 0 : (Math.random() - .5) * 14, jy = r.hit ? 0 : (Math.random() - .5) * 14;
+    line.setAttribute('x2', b.x + jx); line.setAttribute('y2', b.y + jy);
+    line.setAttribute('stroke', color);
+    if (!r.hit) line.setAttribute('stroke-dasharray', '3 3');
+    fxEl.appendChild(line);
+    setTimeout(() => line.remove(), 700);
+    if (r.killed) {
+      const c = document.createElementNS(ns, 'circle');
+      c.setAttribute('class', 'boom'); c.setAttribute('cx', b.x); c.setAttribute('cy', b.y); c.setAttribute('r', 2);
+      c.setAttribute('fill', 'none'); c.setAttribute('stroke', '#ffd166'); c.setAttribute('stroke-width', 2);
+      fxEl.appendChild(c);
+      setTimeout(() => c.remove(), 700);
+    }
+    const f = document.createElement('div');
+    f.className = 'float ' + (r.killed ? 'kill' : r.hit ? 'hit' : 'miss');
+    f.textContent = r.killed ? '撃沈' : r.hit ? '−' + r.dmg.toFixed(1) : 'MISS';
+    f.style.left = b.x + 'px'; f.style.top = b.y + 'px';
+    wrapEl.appendChild(f);
+    setTimeout(() => f.remove(), 950);
+  }
+}
+
+function addLog(html, header) {
+  const li = document.createElement('li');
+  if (header) li.className = 'h';
+  li.innerHTML = html;
+  logEl.prepend(li);
+  while (logEl.children.length > 400) logEl.lastChild.remove();
+}
+
+function inspect(p) {
+  if (!p) return;
+  const t = TYPES[p.type];
+  inspectEl.innerHTML =
+    `<div class="nm ${p.side}">${SIDES[p.side].jp} ${t.name} <span class="kv">@ ${coord(p)}</span></div>` +
+    `<div class="kv">c ${p.hp.toFixed(1)} / ${t.c}　a ${t.a}　e ${t.e}　d ${t.d}</div>` +
+    `<div class="kv">b ~ N(${t.bMean}, ${t.bSd}²)　m ${t.m}${p.moved ? '　移動済み' : ''}</div>`;
+}
+
+// ===================== 入力 =====================
+boardEl.addEventListener('click', e => {
+  const c = e.target.closest('.cell');
+  if (!c || S.busy || (S.phase !== 'blue' && S.phase !== 'red')) return;
+  const x = +c.dataset.x, y = +c.dataset.y;
+  const p = pieceAt(x, y);
+  const sel = S.sel != null ? S.pieces.find(q => q.id === S.sel) : null;
+  if (p && p.side === S.phase) {
+    S.sel = S.sel === p.id ? null : p.id;
+    S.hover = null;
+    render();
+    return;
+  }
+  if (sel && reachable(sel).some(r => r.x === x && r.y === y)) { movePiece(sel, x, y); return; }
+  S.sel = null; render();
+});
+
+boardEl.addEventListener('mouseover', e => {
+  const c = e.target.closest('.cell');
+  if (!c) return;
+  const x = +c.dataset.x, y = +c.dataset.y;
+  inspect(pieceAt(x, y));
+  if (S.sel != null && !S.busy) {
+    const prev = S.hover;
+    S.hover = { x, y };
+    if (!prev || prev.x !== x || prev.y !== y) render();
+  }
+});
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b || b.disabled) return;
+  if (b.dataset.act === 'undo') undo();
+  if (b.dataset.act === 'end') endMove();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && S.sel != null) { S.sel = null; render(); }
+});
+
+function startNew() {
+  const n = clamp(Math.round(Number(document.getElementById('opt-n').value) || 10), 1, 40);
+  document.getElementById('opt-n').value = n;
+  newGame(n);
+}
+document.getElementById('btn-new').addEventListener('click', () => { if (!S.busy) startNew(); });
+document.getElementById('btn-again').addEventListener('click', startNew);
+skipBtn.addEventListener('click', () => { skip = true; skipBtn.disabled = true; });
+
+const flipChk = document.getElementById('opt-flip');
+const applyFlip = () => document.getElementById('cmd-red').classList.toggle('flip', flipChk.checked);
+flipChk.addEventListener('change', applyFlip);
+
+buildBoard();
+applyFlip();
+startNew();
+</script>
+</body>
+</html>
