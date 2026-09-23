@@ -195,8 +195,8 @@ const TYPES = {
   patrol:  { name: '巡察艇', speed: 0.3, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
   // 突撃艦：e・d は中程度、体力大、b が小さい（＝装甲が厚い）、巡察艇の 1.5 倍速
   assault: { name: '突撃艦', speed: 0.45, range: 1.8, span: 1.6, a: 20, e: 100, bMean: 0.30, bSd: 0.25, d: 55, c: 45, r: 0.38 },
-  // 砲撃艦：長射程・高命中だが回避が低い。体力大、b は巡察艇と同じ、スパン長く移動は遅い
-  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, a: 25, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 50, r: 0.45 },
+  // 砲撃艦：長射程・高命中だが回避が低い。体力は低め、b は巡察艇と同じ、スパン長く移動は遅い
+  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, a: 25, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 17, r: 0.45 },
 };
 const SYM = { fighter: '●', patrol: '▲', assault: '◆', artillery: '■' };
 const SIDES = {
