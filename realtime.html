@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>星間戦線 RT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+JP:wght@400;500;700&display=swap">
+<style>
+:root {
+  color-scheme: dark;
+  --void: #070b16;
+  --deck: #0b1222;
+  --panel: #111a2e;
+  --line: #1e2a44;
+  --line-strong: #2d3d60;
+  --ink: #dbe4f5;
+  --muted: #7f8db0;
+  --blue: #4ea2ff;
+  --blue-dim: rgba(78, 162, 255, .16);
+  --red: #ff5c63;
+  --red-dim: rgba(255, 92, 99, .16);
+  --gold: #ffd166;
+  --f-display: "Chakra Petch", "Noto Sans JP", system-ui, sans-serif;
+  --f-body: "Noto Sans JP", system-ui, -apple-system, "Hiragino Sans", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 700px at 50% 40%, #101c38 0%, var(--void) 70%) fixed, var(--void);
+  color: var(--ink);
+  font: 14px/1.6 var(--f-body);
+  padding: 16px;
+}
+button, input, select { font: inherit; color: inherit; }
+button {
+  cursor: pointer; border: 1px solid var(--line-strong); background: var(--deck); color: var(--ink);
+  padding: 5px 11px; border-radius: 4px; font-family: var(--f-display); font-weight: 700; letter-spacing: .04em;
+}
+button:hover:not(:disabled) { border-color: var(--muted); }
+button:disabled { opacity: .35; cursor: not-allowed; }
+button.primary { background: var(--gold); border-color: var(--gold); color: #1a1405; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.app { max-width: 1120px; margin: 0 auto; display: grid; gap: 14px; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { margin: 0; font: 700 26px/1 var(--f-display); letter-spacing: .12em; }
+.brand span { font: 500 11px var(--f-display); color: var(--muted); letter-spacing: .3em; text-transform: uppercase; }
+.clock { display: flex; align-items: center; gap: 10px; font: 600 13px var(--f-mono); color: var(--muted); }
+.clock b { color: var(--ink); font-size: 18px; font-variant-numeric: tabular-nums; }
+
+.layout { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+.theatre { display: grid; gap: 8px; justify-items: center; min-width: 0; }
+
+.cmd {
+  width: 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
+  padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 6px;
+}
+.cmd.flip { transform: rotate(180deg); }
+.cmd .who { font: 700 13px var(--f-display); letter-spacing: .12em; }
+.cmd.blue .who { color: var(--blue); }
+.cmd.red .who { color: var(--red); }
+.cmd .fleet { font: 400 12px var(--f-mono); color: var(--muted); margin-left: 10px; letter-spacing: 0; }
+.cmd .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.cmd .acts button { font-size: 12px; padding: 4px 9px; }
+
+.field-wrap { position: relative; width: 100%; display: grid; justify-items: center; }
+canvas#field {
+  display: block; touch-action: none; border: 1px solid var(--line-strong); border-radius: 4px;
+  background: var(--deck); max-width: 100%;
+}
+.veil {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  background: rgba(4, 7, 14, .6);
+}
+.veil .card {
+  background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; padding: 20px 22px;
+  max-width: 380px; display: grid; gap: 10px;
+}
+.veil h2 { margin: 0; font: 700 22px var(--f-display); letter-spacing: .1em; }
+.veil ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; }
+.veil ul b { color: var(--ink); font-weight: 500; }
+
+.side { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+.box h2 { margin: 0 0 8px; font: 700 12px var(--f-display); letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
+.stats { overflow-x: auto; }
+.stats table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.stats th, .stats td { padding: 3px 5px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.stats th:first-child, .stats td:first-child { text-align: left; }
+.stats thead th { color: var(--muted); font-weight: 500; font-family: var(--f-mono); }
+.stats td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+.stats td:first-child { font-family: var(--f-body); }
+.note { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+.note code { font-family: var(--f-mono); color: var(--ink); }
+.settings { display: grid; grid-template-columns: auto 1fr; gap: 8px 10px; align-items: center; font-size: 13px; }
+.settings select { background: var(--deck); border: 1px solid var(--line-strong); border-radius: 4px; padding: 4px 6px; width: 100%; }
+.settings label.chk { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+.settings .row-btn { grid-column: 1 / -1; display: flex; gap: 8px; }
+.log { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; font: 400 11px/1.55 var(--f-mono); }
+.log li { padding: 2px 0; border-bottom: 1px dashed var(--line); color: var(--muted); }
+.log .b { color: var(--blue); }
+.log .r { color: var(--red); }
+.log .k { color: var(--gold); }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><h1>星間戦線</h1><span>Real-time · 20 × 20 sector</span></div>
+    <div class="clock">
+      <span>T+ <b id="clock">00:00</b></span>
+      <button id="btn-pause" type="button">一時停止</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <section class="theatre" aria-label="戦場">
+      <div class="cmd red" id="cmd-red"></div>
+      <div class="field-wrap" id="wrap">
+        <canvas id="field" width="600" height="600" aria-label="戦場フィールド"></canvas>
+        <div class="veil" id="veil">
+          <div class="card">
+            <h2 id="veil-title">出撃準備</h2>
+            <ul id="veil-body">
+              <li><b>自艦から指でなぞる</b>と、その線に沿って進みます</li>
+              <li><b>空きスペースをドラッグ</b>で範囲選択。選択中の艦をなぞると編隊ごと移動</li>
+              <li><b>艦をタップ</b>で選択に追加／解除</li>
+              <li>射程内に敵が入ると、攻撃スパンごとに自動で攻撃します</li>
+            </ul>
+            <button class="primary" id="btn-start" type="button">出撃</button>
+          </div>
+        </div>
+      </div>
+      <div class="cmd blue" id="cmd-blue"></div>
+    </section>
+
+    <aside class="side">
+      <div class="box stats">
+        <h2>艦種データ</h2>
+        <table>
+          <thead><tr><th></th><th>速度</th><th>射程</th><th>スパン</th><th>a</th><th>e</th><th>b̄</th><th>d</th><th>c</th></tr></thead>
+          <tbody id="stats-body"></tbody>
+        </table>
+        <p class="note">スパンごとに射程内の敵<strong>全員</strong>を攻撃 ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
+      </div>
+      <div class="box">
+        <h2>設定</h2>
+        <div class="settings">
+          <label for="opt-opp">対戦相手</label>
+          <select id="opt-opp">
+            <option value="human">2人対戦（同じ画面）</option>
+            <option value="cpu" selected>CPU（赤）</option>
+            <option value="claude" disabled>Claude 指揮（赤）</option>
+          </select>
+          <label for="opt-speed">ゲーム速度</label>
+          <select id="opt-speed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+          </select>
+          <label class="chk"><input id="opt-flip" type="checkbox" checked> 対面モード（2人対戦時に赤パネルを反転）</label>
+          <label class="chk"><input id="opt-rings" type="checkbox" checked> 選択艦の射程を表示</label>
+          <div class="row-btn"><button id="btn-new" type="button">新しいゲーム</button></div>
+        </div>
+      </div>
+      <div class="box">
+        <h2>戦闘ログ</h2>
+        <ul class="log" id="log"></ul>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ===================== ルール定義 =====================
+const F = 20;          // フィールドの一辺（マス単位）
+const CAMP = 1;        // 陣地の奥行き（上端＝赤、下端＝青。敵陣地には入れない）
+// speed: マス/秒  range: 攻撃半径（マス）  span: 攻撃間隔（秒）  r: 艦の大きさ（衝突半径）
+const TYPES = {
+  fighter: { name: '攻撃機', speed: 1.6, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
+  patrol:  { name: '巡察艇', speed: 1.0, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
+};
+const SIDES = {
+  blue: { player: 'PLAYER 1', jp: '青', enemy: 'red' },
+  red:  { player: 'PLAYER 2', jp: '赤', enemy: 'blue' },
+};
+const PATROL_COLS = [2, 6, 10, 14, 18];
+const WORTH = { fighter: 1, patrol: 2.5 };
+
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+const hitP = (at, dt) => clamp((at.e - dt.d) / 100, 0, 1);
+function gauss(mean, sd) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + sd * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// ===================== 状態 =====================
+let S = null;
+
+function newGame() {
+  const ships = [];
+  let id = 0;
+  for (const side of ['blue', 'red']) {
+    for (let i = 0; i < F; i++) {
+      const viewCol = side === 'blue' ? i : F - 1 - i;
+      const type = PATROL_COLS.includes(viewCol) ? 'patrol' : 'fighter';
+      ships.push({
+        id: id++, side, type, x: i + 0.5, y: side === 'blue' ? F - 0.5 : 0.5,
+        hp: TYPES[type].c, cd: 0, path: [], face: side === 'blue' ? -Math.PI / 2 : Math.PI / 2,
+        orderUntil: 0, dead: false,
+      });
+    }
+  }
+  S = {
+    ships, time: 0, running: false, over: false,
+    sel: { blue: new Set(), red: new Set() },
+    beams: [], floats: [], booms: [], gestures: new Map(),
+    aiT: 0, claudeT: 3, claudePending: false,
+  };
+  logEl.innerHTML = '';
+  veilTitle.textContent = '出撃準備';
+  veilBody.hidden = false;
+  startBtn.textContent = '出撃';
+  veil.hidden = false;
+  pauseBtn.disabled = true;
+  renderHud();
+}
+
+const alive = side => S.ships.filter(s => s.side === side && !s.dead);
+const humanSides = () => oppSel.value === 'human' ? ['blue', 'red'] : ['blue'];
+
+function clampPos(s, x, y) {
+  const r = TYPES[s.type].r;
+  const lo = s.side === 'blue' ? CAMP + r : r;          // 青は赤陣地（上端）に入れない
+  const hi = s.side === 'red' ? F - CAMP - r : F - r;   // 赤は青陣地（下端）に入れない
+  return { x: clamp(x, r, F - r), y: clamp(y, lo, hi) };
+}
+
+// 編隊移動：群れの重心からの相対位置を保ったまま線をなぞる（広がりすぎは圧縮）
+function assignPath(ships, pts) {
+  if (!ships.length || !pts.length) return;
+  const cx = ships.reduce((t, s) => t + s.x, 0) / ships.length;
+  const cy = ships.reduce((t, s) => t + s.y, 0) / ships.length;
+  const maxO = Math.max(...ships.map(s => Math.hypot(s.x - cx, s.y - cy)), 0.001);
+  const k = maxO > 2.2 ? 2.2 / maxO : 1;
+  for (const s of ships) {
+    const ox = (s.x - cx) * k, oy = (s.y - cy) * k;
+    s.path = pts.map(p => clampPos(s, p.x + ox, p.y + oy));
+    s.orderUntil = 0;
+  }
+}
+
+// ===================== シミュレーション =====================
+function step(dt) {
+  S.time += dt;
+
+  // 移動
+  for (const s of S.ships) {
+    if (!s.path.length) continue;
+    const t = TYPES[s.type], p = s.path[0];
+    const dx = p.x - s.x, dy = p.y - s.y, d = Math.hypot(dx, dy), mv = t.speed * dt;
+    if (d > 0.01) s.face = Math.atan2(dy, dx);
+    if (d <= mv) { s.x = p.x; s.y = p.y; s.path.shift(); }
+    else { s.x += dx / d * mv; s.y += dy / d * mv; }
+  }
+  // 重なり防止
+  for (let i = 0; i < S.ships.length; i++) for (let j = i + 1; j < S.ships.length; j++) {
+    const a = S.ships[i], b = S.ships[j];
+    const min = TYPES[a.type].r + TYPES[b.type].r;
+    let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+    if (d >= min) continue;
+    if (d < 1e-4) { dx = Math.random() - .5; dy = Math.random() - .5; d = Math.hypot(dx, dy); }
+    const push = (min - d) / 2;
+    a.x -= dx / d * push; a.y -= dy / d * push;
+    b.x += dx / d * push; b.y += dy / d * push;
+  }
+  for (const s of S.ships) { const c = clampPos(s, s.x, s.y); s.x = c.x; s.y = c.y; }
+
+  // 自動攻撃：スパンごとに射程内の敵すべてを攻撃
+  for (const s of S.ships) {
+    if (s.dead) continue;
+    s.cd = Math.max(0, s.cd - dt);
+    if (s.cd > 0) continue;
+    const t = TYPES[s.type];
+    const targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(s, q) <= t.range);
+    if (!targets.length) continue;
+    s.cd = t.span;
+    for (const q of targets) {
+      const qt = TYPES[q.type];
+      const hit = Math.random() < hitP(t, qt);
+      S.beams.push({ x1: s.x, y1: s.y, x2: q.x + (hit ? 0 : (Math.random() - .5) * .6), y2: q.y + (hit ? 0 : (Math.random() - .5) * .6), side: s.side, hit, t: 0 });
+      if (!hit) { S.floats.push({ x: q.x, y: q.y, text: 'MISS', kind: 'miss', t: 0 }); continue; }
+      const b = Math.max(0, gauss(qt.bMean, qt.bSd));   // 負の b は 0 に丸める
+      const dmg = t.a * b;
+      q.hp -= dmg;
+      S.floats.push({ x: q.x, y: q.y, text: '−' + dmg.toFixed(1), kind: 'hit', t: 0 });
+      if (q.hp < 0 && !q.dead) {
+        q.dead = true;
+        S.booms.push({ x: q.x, y: q.y, t: 0, big: q.type === 'patrol' });
+        addLog(`<span class="${q.side[0]}">${SIDES[q.side].jp} ${qt.name}</span> <span class="k">撃沈</span> ← <span class="${s.side[0]}">${t.name}</span>`);
+      }
+    }
+  }
+  if (S.ships.some(s => s.dead)) {
+    for (const s of S.ships) if (s.dead) { S.sel.blue.delete(s); S.sel.red.delete(s); }
+    S.ships = S.ships.filter(s => !s.dead);
+    renderHud();
+  }
+
+  // エフェクトの寿命
+  for (const arr of [S.beams, S.floats, S.booms]) arr.forEach(e => { e.t += dt; });
+  S.beams = S.beams.filter(e => e.t < 0.3);
+  S.floats = S.floats.filter(e => e.t < 0.9);
+  S.booms = S.booms.filter(e => e.t < 0.7);
+
+  // NPC
+  if (oppSel.value !== 'human') {
+    S.aiT -= dt;
+    if (S.aiT <= 0) { cpuThink('red'); S.aiT = 0.4; }
+    if (oppSel.value === 'claude' && sampleFn) {
+      S.claudeT -= dt;
+      if (S.claudeT <= 0 && !S.claudePending) { S.claudeT = 15; askClaude('red'); }
+    }
+  }
+
+  // 勝敗
+  const nb = alive('blue').length, nr = alive('red').length;
+  if (!nb || !nr) endGame(nb ? 'blue' : nr ? 'red' : null);
+}
+
+function endGame(winner) {
+  S.over = true; S.running = false;
+  pauseBtn.disabled = true;
+  veilTitle.textContent = winner ? `${SIDES[winner].jp}艦隊の勝利` : '相討ち';
+  veilTitle.style.color = winner ? `var(--${winner})` : 'var(--gold)';
+  veilBody.hidden = true;
+  startBtn.textContent = 'もう一度';
+  veil.hidden = false;
+  addLog(`<span class="k">${veilTitle.textContent}（${fmtTime(S.time)}）</span>`);
+}
+
+// ===================== CPU =====================
+// 各艦が「価値 ÷ 距離」の高い敵を狙う。巡察艇は射程差を活かして攻撃機から距離を取る
+function cpuThink(side) {
+  const foes = alive(SIDES[side].enemy);
+  if (!foes.length) return;
+  for (const s of alive(side)) {
+    if (s.orderUntil > S.time) continue;       // Claude の指示を優先
+    const t = TYPES[s.type];
+    let target = null, best = -Infinity;
+    for (const q of foes) {
+      const qt = TYPES[q.type];
+      const val = hitP(t, qt) * t.a * qt.bMean / Math.max(q.hp, 1) * WORTH[q.type];
+      const score = val / (1 + dist(s, q) * 0.35);
+      if (score > best) { best = score; target = q; }
+    }
+    let gx, gy;
+    if (s.type === 'patrol') {
+      const threat = foes.filter(q => q.type === 'fighter').sort((a, b) => dist(s, a) - dist(s, b))[0];
+      if (threat && dist(s, threat) < 2.0) {
+        const d = Math.max(dist(s, threat), 0.01);
+        gx = s.x + (s.x - threat.x) / d * 1.5; gy = s.y + (s.y - threat.y) / d * 1.5;
+      } else {
+        const d = Math.max(dist(s, target), 0.01), keep = t.range * 0.85;
+        gx = target.x + (s.x - target.x) / d * keep; gy = target.y + (s.y - target.y) / d * keep;
+      }
+    } else {
+      const ang = s.id * 2.4;                  // 群がる位置を少しずつずらして包囲する
+      gx = target.x + Math.cos(ang) * 0.9; gy = target.y + Math.sin(ang) * 0.9;
+    }
+    s.path = [clampPos(s, gx, gy)];
+  }
+}
+
+// ===================== Claude 指揮 =====================
+let sampleFn = null;
+
+function claudePrompt(side) {
+  const fmt = arr => arr.map(s => `{"id":${s.id},"type":"${s.type}","x":${s.x.toFixed(1)},"y":${s.y.toFixed(1)},"hp":${s.hp.toFixed(1)}}`).join(',\n');
+  const Fi = TYPES.fighter, P = TYPES.patrol;
+  return `You are the strategic commander of the ${side.toUpperCase()} fleet in a REAL-TIME 2D space battle. The game keeps running while you think; you are consulted about every 15 seconds and your orders last until the next consultation. Ships you give no order to are driven by a simple autopilot that chases the most valuable nearby target.
+
+FIELD: continuous 20x20 area, x = 0..20 left to right, y = 0..20 top to bottom. Red camp is y < 1 (top), blue camp is y > 19 (bottom). ${side} ships can never enter the enemy camp.
+SHIPS move in a straight line to the point you order.
+- fighter: speed ${Fi.speed}/s, attack radius ${Fi.range}, fires every ${Fi.span}s, a=${Fi.a}, e=${Fi.e}, d=${Fi.d}, max hp ${Fi.c}, b mean ${Fi.bMean}
+- patrol : speed ${P.speed}/s, attack radius ${P.range}, fires every ${P.span}s, a=${P.a}, e=${P.e}, d=${P.d}, max hp ${P.c}, b mean ${P.bMean}
+Every shot hits ALL enemies inside the attack radius. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
+Hit chances: fighter->patrol ${Math.round(hitP(Fi, P) * 100)}%, fighter->fighter ${Math.round(hitP(Fi, Fi) * 100)}%, patrol->fighter ${Math.round(hitP(P, Fi) * 100)}%, patrol->patrol ${Math.round(hitP(P, P) * 100)}%.
+
+TIME t=${S.time.toFixed(0)}s.
+YOUR ships (${side}):
+[${fmt(alive(side))}]
+ENEMY ships:
+[${fmt(alive(SIDES[side].enemy))}]
+
+Plan concentrated attacks, flanking and retreats. Reply with ONLY a JSON object:
+{"orders":[{"id":<your ship id>,"x":<target x>,"y":<target y>}, ...],"comment":"<your plan in one short Japanese sentence, max 40 characters>"}`;
+}
+
+async function askClaude(side) {
+  S.claudePending = true;
+  const game = S;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 60000);
+  try {
+    const res = await sampleFn.json(claudePrompt(side), { signal: ctrl.signal, cache: false });
+    if (game !== S || S.over) return;
+    const orders = res && Array.isArray(res.orders) ? res.orders : [];
+    let n = 0;
+    for (const o of orders) {
+      const s = S.ships.find(q => q.id === Number(o.id) && q.side === side);
+      const x = Number(o.x), y = Number(o.y);
+      if (!s || !isFinite(x) || !isFinite(y)) continue;
+      s.path = [clampPos(s, x, y)];
+      s.orderUntil = S.time + 15;
+      n++;
+    }
+    const c = res && typeof res.comment === 'string' ? res.comment.slice(0, 80) : '';
+    addLog(`<span class="r">Claude</span> ${n} 隻に指令${c ? '「' + escapeHtml(c) + '」' : ''}`);
+  } catch (e) {
+    if (game === S) addLog(`<span class="r">Claude</span> 応答なし（${escapeHtml(e && (e.code || e.message) || 'error')}）→ 自動操縦`);
+  } finally {
+    clearTimeout(timer);
+    if (game === S) S.claudePending = false;
+  }
+}
+
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// ===================== 描画 =====================
+const canvas = document.getElementById('field');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
+const veil = document.getElementById('veil');
+const veilTitle = document.getElementById('veil-title');
+const veilBody = document.getElementById('veil-body');
+const startBtn = document.getElementById('btn-start');
+const pauseBtn = document.getElementById('btn-pause');
+const logEl = document.getElementById('log');
+const oppSel = document.getElementById('opt-opp');
+const speedSel = document.getElementById('opt-speed');
+const flipChk = document.getElementById('opt-flip');
+const ringsChk = document.getElementById('opt-rings');
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL = { blue: css('--blue'), red: css('--red'), gold: css('--gold'), line: css('--line'), deck: css('--deck'), muted: css('--muted') };
+let unit = 30, dpr = 1;
+
+function resize() {
+  const avail = Math.min(wrap.clientWidth, Math.max(300, window.innerHeight - 190), 760);
+  dpr = window.devicePixelRatio || 1;
+  canvas.style.width = avail + 'px';
+  canvas.style.height = avail + 'px';
+  canvas.width = Math.round(avail * dpr);
+  canvas.height = Math.round(avail * dpr);
+  unit = avail / F;
+}
+
+function draw() {
+  const u = unit;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = COL.deck;
+  ctx.fillRect(0, 0, F * u, F * u);
+  // 陣地
+  ctx.fillStyle = 'rgba(255, 92, 99, .10)'; ctx.fillRect(0, 0, F * u, CAMP * u);
+  ctx.fillStyle = 'rgba(78, 162, 255, .10)'; ctx.fillRect(0, (F - CAMP) * u, F * u, CAMP * u);
+  // 目盛り（座標感覚のための点）
+  ctx.fillStyle = COL.line;
+  for (let y = 1; y < F; y++) for (let x = 1; x < F; x++) ctx.fillRect(x * u - 1, y * u - 1, 2, 2);
+
+  // 射程リング（選択艦）
+  if (ringsChk.checked) {
+    for (const side of ['blue', 'red']) for (const s of S.sel[side]) {
+      ctx.beginPath(); ctx.arc(s.x * u, s.y * u, TYPES[s.type].range * u, 0, Math.PI * 2);
+      ctx.strokeStyle = COL[side]; ctx.globalAlpha = .22; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
+    }
+  }
+  // 航路
+  ctx.setLineDash([4, 4]); ctx.lineWidth = 1;
+  for (const s of S.ships) {
+    if (!s.path.length) continue;
+    if (s.side === 'red' && oppSel.value !== 'human') continue;   // NPC の航路は見せない
+    ctx.beginPath(); ctx.moveTo(s.x * u, s.y * u);
+    for (const p of s.path) ctx.lineTo(p.x * u, p.y * u);
+    ctx.strokeStyle = COL[s.side]; ctx.globalAlpha = .45; ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  ctx.setLineDash([]);
+
+  // 艦
+  for (const s of S.ships) {
+    const t = TYPES[s.type], col = COL[s.side], R = t.r * u;
+    ctx.save(); ctx.translate(s.x * u, s.y * u);
+    if (S.sel[s.side].has(s)) {
+      ctx.beginPath(); ctx.arc(0, 0, R + 4, 0, Math.PI * 2); ctx.strokeStyle = COL.gold; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    ctx.fillStyle = col;
+    if (s.type === 'fighter') { ctx.beginPath(); ctx.arc(0, 0, R * 0.85, 0, Math.PI * 2); ctx.fill(); }
+    else {
+      ctx.rotate(s.face);
+      ctx.beginPath(); ctx.moveTo(R * 1.15, 0); ctx.lineTo(-R * 0.8, R * 0.85); ctx.lineTo(-R * 0.8, -R * 0.85); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // 体力バー
+    const bw = Math.max(12, R * 2), bx = s.x * u - bw / 2, by = s.y * u + R + 3;
+    ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(bx, by, bw, 2);
+    ctx.fillStyle = col; ctx.fillRect(bx, by, bw * clamp(s.hp / t.c, 0, 1), 2);
+  }
+
+  // 攻撃
+  for (const b of S.beams) {
+    ctx.globalAlpha = 1 - b.t / 0.3;
+    ctx.strokeStyle = COL[b.side]; ctx.lineWidth = b.hit ? 2 : 1;
+    if (!b.hit) ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(b.x1 * u, b.y1 * u); ctx.lineTo(b.x2 * u, b.y2 * u); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  for (const b of S.booms) {
+    ctx.globalAlpha = 1 - b.t / 0.7;
+    ctx.strokeStyle = COL.gold; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(b.x * u, b.y * u, (b.big ? 1.1 : 0.7) * u * (0.2 + b.t / 0.7), 0, Math.PI * 2); ctx.stroke();
+  }
+  ctx.font = '600 11px "JetBrains Mono", monospace'; ctx.textAlign = 'center';
+  for (const f of S.floats) {
+    ctx.globalAlpha = 1 - f.t / 0.9;
+    ctx.fillStyle = f.kind === 'miss' ? COL.muted : COL.gold;
+    ctx.fillText(f.text, f.x * u, f.y * u - 10 - f.t * 18);
+  }
+  ctx.globalAlpha = 1;
+
+  // 入力中のジェスチャ
+  for (const g of S.gestures.values()) {
+    ctx.strokeStyle = COL[g.side]; ctx.lineWidth = 2;
+    if (g.kind === 'box') {
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(Math.min(g.x0, g.x1) * u, Math.min(g.y0, g.y1) * u, Math.abs(g.x1 - g.x0) * u, Math.abs(g.y1 - g.y0) * u);
+      ctx.setLineDash([]);
+    } else if (g.pts.length > 1) {
+      ctx.beginPath(); ctx.moveTo(g.pts[0].x * u, g.pts[0].y * u);
+      for (const p of g.pts) ctx.lineTo(p.x * u, p.y * u);
+      ctx.stroke();
+    }
+  }
+}
+
+function fmtTime(t) {
+  const s = Math.floor(t);
+  return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+}
+
+function renderHud() {
+  for (const side of ['blue', 'red']) {
+    const el = document.getElementById('cmd-' + side);
+    const mine = alive(side);
+    const npc = side === 'red' && oppSel.value !== 'human';
+    const name = npc ? (oppSel.value === 'claude' && sampleFn ? 'CLAUDE' : 'CPU') : SIDES[side].player;
+    el.classList.toggle('flip', side === 'red' && flipChk.checked && oppSel.value === 'human');
+    el.innerHTML =
+      `<div class="who">${name} · ${SIDES[side].jp}<span class="fleet">● ${mine.filter(s => s.type === 'fighter').length}　▲ ${mine.filter(s => s.type === 'patrol').length}</span></div>` +
+      (npc ? '' : `<div class="acts">` +
+        `<button type="button" data-side="${side}" data-act="all">全艦選択</button>` +
+        `<button type="button" data-side="${side}" data-act="fighters">攻撃機</button>` +
+        `<button type="button" data-side="${side}" data-act="patrols">巡察艇</button>` +
+        `<button type="button" data-side="${side}" data-act="halt">停止</button>` +
+        `<button type="button" data-side="${side}" data-act="clear">解除</button></div>`);
+  }
+}
+
+function addLog(html) {
+  const li = document.createElement('li');
+  li.innerHTML = `${fmtTime(S.time)} ${html}`;
+  logEl.prepend(li);
+  while (logEl.children.length > 200) logEl.lastChild.remove();
+}
+
+document.getElementById('stats-body').innerHTML = Object.values(TYPES).map((t, i) =>
+  `<tr><td>${i ? '▲' : '●'} ${t.name}</td><td>${t.speed}</td><td>${t.range}</td><td>${t.span}s</td><td>${t.a}</td><td>${t.e}</td><td>${t.bMean}</td><td>${t.d}</td><td>${t.c}</td></tr>`).join('');
+
+// ===================== 入力（マルチタッチ対応：2人が同時に操作できる） =====================
+function toField(e) {
+  const r = canvas.getBoundingClientRect();
+  return { x: (e.clientX - r.left) / r.width * F, y: (e.clientY - r.top) / r.height * F };
+}
+
+canvas.addEventListener('pointerdown', e => {
+  if (!S.running) return;
+  const p = toField(e);
+  const sides = humanSides();
+  let hit = null, hd = Infinity;
+  for (const s of S.ships) {
+    if (!sides.includes(s.side)) continue;
+    const d = dist(s, p);
+    if (d < Math.max(TYPES[s.type].r + 0.3, 0.55) && d < hd) { hit = s; hd = d; }
+  }
+  canvas.setPointerCapture(e.pointerId);
+  if (hit) {
+    const group = S.sel[hit.side].has(hit) ? [...S.sel[hit.side]] : [hit];
+    S.gestures.set(e.pointerId, { kind: 'path', side: hit.side, hit, ships: group, pts: [p], len: 0 });
+  } else {
+    const side = sides.length === 2 ? (p.y < F / 2 ? 'red' : 'blue') : 'blue';
+    S.gestures.set(e.pointerId, { kind: 'box', side, x0: p.x, y0: p.y, x1: p.x, y1: p.y });
+  }
+});
+
+canvas.addEventListener('pointermove', e => {
+  const g = S.gestures.get(e.pointerId);
+  if (!g) return;
+  const p = toField(e);
+  if (g.kind === 'box') { g.x1 = p.x; g.y1 = p.y; return; }
+  const last = g.pts[g.pts.length - 1];
+  const d = dist(last, p);
+  if (d > 0.18) { g.pts.push(p); g.len += d; }
+});
+
+function finishGesture(e) {
+  const g = S.gestures.get(e.pointerId);
+  if (!g) return;
+  S.gestures.delete(e.pointerId);
+  const sel = S.sel[g.side];
+  if (g.kind === 'path') {
+    if (g.len < 0.35) {                        // タップ：選択に追加／解除
+      if (sel.has(g.hit)) sel.delete(g.hit); else sel.add(g.hit);
+    } else {
+      assignPath(g.ships.filter(s => !s.dead), g.pts.slice(1));
+    }
+  } else {
+    const w = Math.abs(g.x1 - g.x0), h = Math.abs(g.y1 - g.y0);
+    sel.clear();
+    if (w > 0.3 || h > 0.3) {
+      const x0 = Math.min(g.x0, g.x1), x1 = Math.max(g.x0, g.x1), y0 = Math.min(g.y0, g.y1), y1 = Math.max(g.y0, g.y1);
+      for (const s of alive(g.side)) if (s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1) sel.add(s);
+    }
+  }
+}
+canvas.addEventListener('pointerup', finishGesture);
+canvas.addEventListener('pointercancel', e => S.gestures.delete(e.pointerId));
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const side = b.dataset.side, sel = S.sel[side], mine = alive(side);
+  if (b.dataset.act === 'all') { sel.clear(); mine.forEach(s => sel.add(s)); }
+  if (b.dataset.act === 'fighters') { sel.clear(); mine.filter(s => s.type === 'fighter').forEach(s => sel.add(s)); }
+  if (b.dataset.act === 'patrols') { sel.clear(); mine.filter(s => s.type === 'patrol').forEach(s => sel.add(s)); }
+  if (b.dataset.act === 'halt') (sel.size ? [...sel] : mine).forEach(s => { s.path = []; });
+  if (b.dataset.act === 'clear') sel.clear();
+});
+
+startBtn.addEventListener('click', () => {
+  if (S.over) newGame();
+  veil.hidden = true;
+  S.running = true;
+  pauseBtn.disabled = false;
+  pauseBtn.textContent = '一時停止';
+});
+pauseBtn.addEventListener('click', togglePause);
+function togglePause() {
+  if (S.over || !veil.hidden) return;
+  S.running = !S.running;
+  pauseBtn.textContent = S.running ? '一時停止' : '再開';
+}
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePause(); }
+});
+document.getElementById('btn-new').addEventListener('click', newGame);
+oppSel.addEventListener('change', () => { S.sel.red.clear(); renderHud(); });
+flipChk.addEventListener('change', renderHud);
+
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('sample').then(fn => {
+    if (!fn) return;
+    sampleFn = fn;
+    oppSel.querySelector('option[value="claude"]').disabled = false;
+    renderHud();
+  }).catch(() => {});
+}
+
+// ===================== ループ =====================
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  if (S.running) {
+    step(dt * Number(speedSel.value));
+    document.getElementById('clock').textContent = fmtTime(S.time);
+  }
+  draw();
+  requestAnimationFrame(frame);
+}
+
+newGame();
+resize();
+new ResizeObserver(resize).observe(wrap);
+window.addEventListener('resize', resize);
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
