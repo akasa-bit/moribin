@@ -55,7 +55,7 @@ button.primary { background: var(--gold); border-color: var(--gold); color: #1a1
 .clock b { color: var(--ink); font-size: 18px; font-variant-numeric: tabular-nums; }
 
 .layout { display: grid; gap: 16px; grid-template-columns: 1fr; }
-@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 300px; align-items: start; } }
+@media (min-width: 960px) { .layout { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; } }
 .theatre { display: grid; gap: 8px; justify-items: center; min-width: 0; }
 
 .cmd {
@@ -69,6 +69,15 @@ button.primary { background: var(--gold); border-color: var(--gold); color: #1a1
 .cmd .fleet { font: 400 12px var(--f-mono); color: var(--muted); margin-left: 10px; letter-spacing: 0; }
 .cmd .acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .cmd .acts button { font-size: 12px; padding: 4px 9px; }
+.cmd .acts { align-items: center; }
+.cmd .bt {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 8px;
+  border: 1px solid var(--line-strong); border-radius: 4px; font: 400 12px var(--f-mono);
+}
+.cmd .bt b { color: var(--ink); min-width: 1.6em; text-align: right; font-variant-numeric: tabular-nums; }
+.cmd .bt small { color: var(--muted); }
+.cmd .bt button { padding: 0 7px; line-height: 1.5; }
+.cmd .fleet b { color: var(--ink); }
 
 .field-wrap { position: relative; width: 100%; display: grid; justify-items: center; }
 canvas#field {
@@ -129,7 +138,8 @@ canvas#field {
           <div class="card">
             <h2 id="veil-title">出撃準備</h2>
             <ul id="veil-body">
-              <li>最初の <b>60 秒は配置フェーズ</b>。自陣側の点線より手前で艦をドラッグして陣形を組みます（多層・楔形・二列のプリセットあり）。双方が「準備完了」を押すと即開始</li>
+              <li>まず<b>編成</b>：予算内で艦種ごとの隻数を決めます（コストは艦種データ参照）</li>
+              <li>次の <b>60 秒は配置フェーズ</b>。自陣側の点線より手前で艦をドラッグして陣形を組みます（多層・楔形・二列のプリセットあり）。双方が「準備完了」を押すと即開始</li>
               <li><b>自艦から指でなぞる</b>と、その線に沿って進みます</li>
               <li><b>空きスペースをドラッグ</b>で範囲選択。選択中の艦をなぞると編隊ごと移動</li>
               <li><b>艦をタップ</b>で選択に追加／解除</li>
@@ -146,7 +156,7 @@ canvas#field {
       <div class="box stats">
         <h2>艦種データ</h2>
         <table>
-          <thead><tr><th></th><th>速度</th><th>射程</th><th>スパン</th><th>a</th><th>e</th><th>b̄</th><th>d</th><th>c</th></tr></thead>
+          <thead><tr><th></th><th>速度</th><th>射程</th><th>スパン</th><th>a</th><th>e</th><th>b̄</th><th>d</th><th>c</th><th>費</th></tr></thead>
           <tbody id="stats-body"></tbody>
         </table>
         <p class="note">スパンごとに射程内の敵<strong>全員</strong>を攻撃 ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
@@ -159,6 +169,12 @@ canvas#field {
             <option value="human">2人対戦（同じ画面）</option>
             <option value="cpu" selected>CPU（赤）</option>
             <option value="claude" disabled>Claude 指揮（赤）</option>
+          </select>
+          <label for="opt-budget">編成予算</label>
+          <select id="opt-budget">
+            <option value="50">50（小規模）</option>
+            <option value="80" selected>80（標準）</option>
+            <option value="120">120（大規模）</option>
           </select>
           <label for="opt-speed">ゲーム速度</label>
           <select id="opt-speed">
@@ -188,7 +204,21 @@ const F = 30;          // フィールドの一辺（マス単位）
 const CAMP = 1;        // 陣地の奥行き（上端＝赤、下端＝青。敵陣地には入れない）
 const DEPLOY = 8;      // 配置フェーズで艦を置ける範囲（自陣側の端からの距離）
 const DEPLOY_TIME = 60;
-const FLEET = { fighter: 12, patrol: 4, assault: 4, artillery: 2 };   // 1陣営の編成
+const FLEET = { fighter: 12, patrol: 4, assault: 4, artillery: 2 };   // 標準編成（コスト 78）
+const COST = { fighter: 2, patrol: 5, assault: 6, artillery: 5 };     // 艦ごとの編成コスト
+const MAX_PER_TYPE = 30;
+const fleetCost = f => Object.keys(f).reduce((t, k) => t + f[k] * COST[k], 0);
+const budget = () => Number(budgetSel.value);
+
+// 予算に合わせて標準編成を拡大縮小し、余りを攻撃機に回す（CPU の編成・初期値）
+function autoFleet(b) {
+  const k = b / fleetCost(FLEET);
+  const f = {};
+  for (const t of Object.keys(FLEET)) f[t] = Math.max(t === 'fighter' ? 0 : 1, Math.floor(FLEET[t] * k));
+  while (fleetCost(f) > b && f.fighter > 0) f.fighter--;
+  f.fighter = Math.min(MAX_PER_TYPE, f.fighter + Math.floor((b - fleetCost(f)) / COST.fighter));
+  return f;
+}
 // speed: マス/秒  range: 攻撃半径（マス）  span: 攻撃間隔（秒）  r: 艦の大きさ（衝突半径）
 const TYPES = {
   fighter: { name: '攻撃機', speed: 0.5, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
@@ -218,32 +248,37 @@ function gauss(mean, sd) {
 // ===================== 状態 =====================
 let S = null;
 
-function newGame() {
-  const ships = [];
-  let id = 0;
-  for (const side of ['blue', 'red']) {
-    for (const [type, n] of Object.entries(FLEET)) for (let i = 0; i < n; i++) {
-      ships.push({
-        id: id++, side, type, x: F / 2, y: F / 2,
-        hp: TYPES[type].c, cd: 0, path: [], face: side === 'blue' ? -Math.PI / 2 : Math.PI / 2,
-        orderUntil: 0, dead: false,
-      });
-    }
+// 編成に合わせてその陣営の艦を作り直し、標準陣形に並べる
+function rebuildSide(side) {
+  S.ships = S.ships.filter(q => q.side !== side);
+  S.sel[side].clear();
+  for (const [type, n] of Object.entries(S.fleet[side])) for (let i = 0; i < n; i++) {
+    S.ships.push({
+      id: S.nextId++, side, type, x: F / 2, y: F / 2,
+      hp: TYPES[type].c, cd: 0, path: [], face: side === 'blue' ? -Math.PI / 2 : Math.PI / 2,
+      orderUntil: 0, dead: false,
+    });
   }
+  formation(side, 'layers');
+  separate();
+}
+
+function newGame() {
   S = {
-    ships, time: 0, running: false, over: false,
+    ships: [], nextId: 0, time: 0, running: false, over: false,
+    fleet: { blue: autoFleet(budget()), red: autoFleet(budget()) },
     phase: 'intro', deployT: DEPLOY_TIME, ready: { blue: false, red: false },
     sel: { blue: new Set(), red: new Set() },
     beams: [], floats: [], booms: [], gestures: new Map(),
     aiT: 0, claudeT: 3, claudePending: false,
   };
-  formation('blue', 'layers');
-  formation('red', 'layers');
+  rebuildSide('blue');
+  rebuildSide('red');
   logEl.innerHTML = '';
   veilTitle.textContent = '出撃準備';
   veilTitle.style.color = '';
   veilBody.hidden = false;
-  startBtn.textContent = '配置を始める';
+  startBtn.textContent = '編成を始める';
   veil.hidden = false;
   pauseBtn.disabled = true;
   renderHud();
@@ -272,8 +307,9 @@ function formation(side, kind) {
   } else if (kind === 'wedge') {  // 楔形：突撃艦を先頭に攻撃機が両翼へ広がる
     spread(A, 7.4, 13.2, 16.8);
     const half = Math.ceil(F_.length / 2);
-    F_.slice(0, half).forEach((q, i) => put(q, 12.5 - i * 1.7, 6.6 - i * 0.8));
-    F_.slice(half).forEach((q, i) => put(q, 17.5 + i * 1.7, 6.6 - i * 0.8));
+    const sx = Math.min(1.7, 11 / Math.max(half, 1)), sy = Math.min(0.8, 5.2 / Math.max(half, 1));
+    F_.slice(0, half).forEach((q, i) => put(q, 12.5 - i * sx, 6.6 - i * sy));
+    F_.slice(half).forEach((q, i) => put(q, 17.5 + i * sx, 6.6 - i * sy));
     spread(P, 4.4, 11, 19);
     spread(R, 1.8, 13, 17);
   } else {                        // 二列：前列に攻撃機と突撃艦、後列に巡察艇と砲撃艦
@@ -326,11 +362,23 @@ function separate() {
   for (const s of S.ships) { const c = clampPos(s, s.x, s.y); s.x = c.x; s.y = c.y; }
 }
 
+function startBuild() {
+  S.phase = 'build';
+  S.ready = { blue: false, red: oppSel.value !== 'human' };
+  veil.hidden = true;
+  addLog('編成フェーズ開始（予算 ' + budget() + '）');
+  renderHud();
+}
+
 function startDeploy() {
   S.phase = 'deploy';
   S.deployT = DEPLOY_TIME;
   S.ready = { blue: false, red: oppSel.value !== 'human' };
   veil.hidden = true;
+  for (const side of ['blue', 'red']) {
+    const f = S.fleet[side];
+    addLog(`<span class="${side[0]}">${SIDES[side].jp}</span> 編成 ` + Object.keys(TYPES).map(k => `${SYM[k]}${f[k]}`).join(' ') + `（${fleetCost(f)}）`);
+  }
   addLog('配置フェーズ開始');
   renderHud();
 }
@@ -526,6 +574,7 @@ const pauseBtn = document.getElementById('btn-pause');
 const logEl = document.getElementById('log');
 const oppSel = document.getElementById('opt-opp');
 const speedSel = document.getElementById('opt-speed');
+const budgetSel = document.getElementById('opt-budget');
 const flipChk = document.getElementById('opt-flip');
 const ringsChk = document.getElementById('opt-rings');
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -659,7 +708,16 @@ function renderHud() {
     const counts = Object.keys(TYPES).map(k => `${SYM[k]} ${mine.filter(s => s.type === k).length}`).join('　');
     const btn = (act, label, extra = '') => `<button type="button" data-side="${side}" data-act="${act}"${extra}>${label}</button>`;
     let acts = '';
-    if (!npc && S.phase === 'deploy') {
+    if (!npc && S.phase === 'build') {
+      const f = S.fleet[side], left = budget() - fleetCost(f), done = S.ready[side];
+      acts = `<span class="fleet">残り <b>${left}</b> / ${budget()}</span>` + Object.keys(TYPES).map(k =>
+        `<span class="bt" title="${TYPES[k].name}：コスト ${COST[k]}">${SYM[k]} <b>${f[k]}</b><small>×${COST[k]}</small>` +
+        btn('sub-' + k, '−', f[k] > 0 && !done ? '' : ' disabled') +
+        btn('add-' + k, '+', left >= COST[k] && f[k] < MAX_PER_TYPE && !done ? '' : ' disabled') + `</span>`).join('') +
+        btn('ready', done ? '決定 ✓' : '決定', done ? ' class="primary"' : '');
+    } else if (npc && S.phase === 'build') {
+      acts = '<span class="fleet">編成完了</span>';
+    } else if (!npc && S.phase === 'deploy') {
       acts = btn('form-layers', '多層') + btn('form-wedge', '楔形') + btn('form-rows', '二列') + btn('all', '全艦') + btn('clear', '解除') +
         btn('ready', S.ready[side] ? '準備完了 ✓' : '準備完了', S.ready[side] ? ' class="primary"' : '');
     } else if (!npc) {
@@ -678,7 +736,7 @@ function addLog(html) {
 }
 
 document.getElementById('stats-body').innerHTML = Object.entries(TYPES).map(([k, t]) =>
-  `<tr><td>${SYM[k]} ${t.name}</td><td>${t.speed}</td><td>${t.range}</td><td>${t.span}s</td><td>${t.a}</td><td>${t.e}</td><td>${t.bMean}</td><td>${t.d}</td><td>${t.c}</td></tr>`).join('');
+  `<tr><td>${SYM[k]} ${t.name}</td><td>${t.speed}</td><td>${t.range}</td><td>${t.span}s</td><td>${t.a}</td><td>${t.e}</td><td>${t.bMean}</td><td>${t.d}</td><td>${t.c}</td><td>${COST[k]}</td></tr>`).join('');
 
 // ===================== 入力（マルチタッチ対応：2人が同時に操作できる） =====================
 function toField(e) {
@@ -760,6 +818,19 @@ document.addEventListener('click', e => {
   const act = b.dataset.act;
   if (act.startsWith('type-')) { sel.clear(); mine.filter(s => s.type === act.slice(5)).forEach(s => sel.add(s)); }
   if (act.startsWith('form-') && S.phase === 'deploy' && !S.ready[side]) { formation(side, act.slice(5)); separate(); }
+  if ((act.startsWith('add-') || act.startsWith('sub-')) && S.phase === 'build' && !S.ready[side]) {
+    const k = act.slice(4), f = S.fleet[side];
+    if (act.startsWith('add-') && budget() - fleetCost(f) >= COST[k] && f[k] < MAX_PER_TYPE) f[k]++;
+    if (act.startsWith('sub-') && f[k] > 0) f[k]--;
+    rebuildSide(side);
+    renderHud();
+  }
+  if (act === 'ready' && S.phase === 'build') {
+    if (!S.ready[side] && !alive(side).length) return;
+    S.ready[side] = !S.ready[side];
+    if (S.ready.blue && S.ready.red) startDeploy(); else renderHud();
+    return;                                    // 同じクリックを配置フェーズの「準備完了」として扱わない
+  }
   if (act === 'ready' && S.phase === 'deploy') {
     S.ready[side] = !S.ready[side];
     if (S.ready[side]) sel.clear();
@@ -771,7 +842,7 @@ document.addEventListener('click', e => {
 
 startBtn.addEventListener('click', () => {
   if (S.over) newGame();
-  startDeploy();
+  startBuild();
 });
 pauseBtn.addEventListener('click', togglePause);
 function togglePause() {
@@ -783,10 +854,15 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePause(); }
 });
 document.getElementById('btn-new').addEventListener('click', newGame);
+budgetSel.addEventListener('change', () => { if (S.phase === 'intro' || S.phase === 'build' || S.over) newGame(); });
 oppSel.addEventListener('change', () => {
   S.sel.red.clear();
+  if (S.phase === 'build' && oppSel.value !== 'human') {
+    S.fleet.red = autoFleet(budget()); rebuildSide('red'); S.ready.red = true;
+    if (S.ready.blue) { startDeploy(); return; }
+  }
   if (S.phase === 'deploy' && oppSel.value !== 'human') { formation('red', 'layers'); S.ready.red = true; if (S.ready.blue) { startBattle(); return; } }
-  if (S.phase === 'deploy' && oppSel.value === 'human') S.ready.red = false;
+  if ((S.phase === 'deploy' || S.phase === 'build') && oppSel.value === 'human') S.ready.red = false;
   renderHud();
 });
 flipChk.addEventListener('change', renderHud);
