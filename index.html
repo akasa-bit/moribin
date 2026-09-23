@@ -251,6 +251,12 @@ button:disabled { opacity: .35; cursor: not-allowed; }
         <div class="settings">
           <label for="opt-n">行動力 n</label>
           <input id="opt-n" type="number" min="1" max="40" value="10">
+          <label for="opt-opp">対戦相手</label>
+          <select id="opt-opp">
+            <option value="human">2人対戦</option>
+            <option value="cpu">CPU（赤）</option>
+            <option value="claude" disabled>Claude（赤）</option>
+          </select>
           <label for="opt-order">攻撃順</label>
           <select id="opt-order">
             <option value="sim">同時</option>
@@ -344,8 +350,13 @@ function gauss(mean, sd) {
 }
 
 function reachable(p) {
+  if (S.busy) return [];
+  return legalMoves(p);
+}
+
+function legalMoves(p) {
   const t = TYPES[p.type];
-  if (S.busy || S.phase !== p.side || p.moved || S.ap < t.m) return [];
+  if (S.phase !== p.side || p.moved || S.ap < t.m) return [];
   const enemyCamp = SIDES[SIDES[p.side].enemy].camp;
   const out = [];
   for (let dy = -t.move; dy <= t.move; dy++) {
@@ -387,9 +398,155 @@ function endMove() {
     S.pieces.forEach(p => { p.moved = false; });
     addLog(`<span class="h">TURN ${S.turn} ― 赤の移動</span>`, true);
     render();
+    if (npc()) runNpc();
   } else if (S.phase === 'red') {
     combat();
   }
+}
+
+// ===================== NPC（赤） =====================
+// opponent: human = 2人対戦 / cpu = 内蔵AI / claude = Claude に指し手を尋ねる（公開版のみ）
+const npc = () => oppSel.value !== 'human';
+const WORTH = { fighter: 1, patrol: 2.5 };
+const hitP = (atkT, defT) => clamp((atkT.e - defT.d) / 100, 0, 1);
+
+// 位置 (x, y) にいるコマ pc の評価値。与える期待ダメージ − 受ける期待ダメージ − 敵との距離
+function scoreAt(pc, x, y, pieces) {
+  const t = TYPES[pc.type];
+  let dealt = 0, recv = 0, nearest = 99;
+  for (const q of pieces) {
+    if (q.side === pc.side) continue;
+    const qt = TYPES[q.type];
+    const d = Math.max(Math.abs(q.x - x), Math.abs(q.y - y));
+    nearest = Math.min(nearest, d);
+    if (d <= t.range) dealt += Math.min(hitP(t, qt) * t.a * qt.bMean, q.hp + 0.5) / qt.c * WORTH[q.type];
+    if (d <= qt.range) recv += Math.min(hitP(qt, t) * qt.a * t.bMean, pc.hp + 0.5) / t.c * WORTH[pc.type];
+  }
+  return dealt - 0.85 * recv - 0.03 * nearest;
+}
+
+// 貪欲法：行動力あたりの改善幅が最大の移動から順に採用する
+function cpuPlan(side) {
+  const sim = S.pieces.map(p => ({ ...p }));
+  const enemyCamp = SIDES[SIDES[side].enemy].camp;
+  const occupied = (x, y) => sim.some(q => q.x === x && q.y === y);
+  let ap = S.ap;
+  const moves = [];
+  for (;;) {
+    let best = null;
+    for (const pc of sim) {
+      const t = TYPES[pc.type];
+      if (pc.side !== side || pc.moved || t.m > ap) continue;
+      const cur = scoreAt(pc, pc.x, pc.y, sim);
+      for (let dy = -t.move; dy <= t.move; dy++) for (let dx = -t.move; dx <= t.move; dx++) {
+        const x = pc.x + dx, y = pc.y + dy;
+        if ((!dx && !dy) || x < 0 || y < 0 || x >= W || y >= H || y === enemyCamp || occupied(x, y)) continue;
+        const gain = (scoreAt(pc, x, y, sim) - cur) / t.m;
+        if (gain > 0.001 && (!best || gain > best.gain)) best = { pc, x, y, gain };
+      }
+    }
+    if (!best) break;
+    best.pc.x = best.x; best.pc.y = best.y; best.pc.moved = true;
+    ap -= TYPES[best.pc.type].m;
+    moves.push({ id: best.pc.id, x: best.x, y: best.y });
+  }
+  return moves;
+}
+
+let sampleFn = null;
+
+function claudePrompt(side) {
+  const ch = { blue: { fighter: 'b', patrol: 'B' }, red: { fighter: 'r', patrol: 'R' } };
+  const rows = [];
+  for (let y = 0; y < H; y++) {
+    let r = '';
+    for (let x = 0; x < W; x++) { const q = pieceAt(x, y); r += q ? ch[q.side][q.type] : '.'; }
+    rows.push(String(y).padStart(2) + ' ' + r);
+  }
+  const list = sd => S.pieces.filter(q => q.side === sd)
+    .map(q => `{"id":${q.id},"type":"${q.type}","x":${q.x},"y":${q.y},"hp":${q.hp.toFixed(1)}}`).join(',\n');
+  const F = TYPES.fighter, P = TYPES.patrol;
+  return `You are the NPC commander of the ${side.toUpperCase()} fleet in a 2-player turn-based space battle game on a 20x20 grid. Choose your moves for this turn to win (destroy all enemy pieces).
+
+COORDINATES: x = column 0..19 (left to right), y = row 0..19. Red camp is row y=0, blue camp is row y=19. You are ${side}. You may NEVER enter the enemy camp row (y=${SIDES[SIDES[side].enemy].camp}).
+
+TURN ORDER: blue moves, then red moves, then combat happens immediately. ${side === 'red' ? 'Blue has ALREADY moved this turn, so the positions below are exactly where blue will be during combat.' : ''}
+Combat attack order setting: "${ORDER_LABEL[orderSel.value]}" (sim = everyone fires simultaneously on the start-of-combat positions, kills applied at the end).
+
+MOVEMENT: action points n=${S.n} this turn. Each piece may move at most once; moving costs m action points; the sum of m must be <= ${S.ap}. A piece may move to any EMPTY cell within its movement square (Chebyshev distance). Two pieces can never share a cell. Moves are applied in the order you list them.
+- fighter: move distance <= ${F.move} (11x11 square), m=${F.m}
+- patrol : move distance <= ${P.move} (7x7 square), m=${P.m}
+
+COMBAT: every piece automatically attacks EVERY enemy within its attack range (Chebyshev distance): fighter range ${F.range} (3x3), patrol range ${P.range} (5x5).
+Hit chance = (e_attacker - d_target)/100. On hit, target hp -= a_attacker * b_target, where b ~ Normal(mean, 0.25). hp < 0 destroys the piece.
+- fighter: a=${F.a}, e=${F.e}, d=${F.d}, max hp=${F.c}, b mean=${F.bMean}
+- patrol : a=${P.a}, e=${P.e}, d=${P.d}, max hp=${P.c}, b mean=${P.bMean}
+Hit chances: fighter->patrol ${Math.round(hitP(F, P) * 100)}%, fighter->fighter ${Math.round(hitP(F, F) * 100)}%, patrol->fighter ${Math.round(hitP(P, F) * 100)}%, patrol->patrol ${Math.round(hitP(P, P) * 100)}%.
+
+TURN ${S.turn}. MAP (b/B = blue fighter/patrol, r/R = red fighter/patrol, . = empty):
+   x 01234567890123456789
+${rows.join('\n')}
+
+YOUR pieces (${side}):
+[${list(side)}]
+
+ENEMY pieces:
+[${list(SIDES[side].enemy)}]
+
+Think about focusing fire, trading favorably (fighters are strong against patrols; patrols out-range fighters), and not exposing pieces needlessly. Pieces you don't list stay where they are.
+
+Reply with ONLY a JSON object, no prose:
+{"moves":[{"id":<piece id>,"x":<new x>,"y":<new y>}, ...],"comment":"<one short sentence in Japanese describing your plan, max 40 characters>"}`;
+}
+
+async function claudePlan(side) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
+  try {
+    const res = await sampleFn.json(claudePrompt(side), { signal: ctrl.signal, cache: false });
+    if (!res || !Array.isArray(res.moves)) throw { message: '形式が不正な応答' };
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function runNpc() {
+  const side = 'red';
+  const who = oppSel.value;
+  S.busy = true; S.thinking = true;
+  render();
+  let plan = null, comment = '';
+  if (who === 'claude' && sampleFn) {
+    try {
+      const res = await claudePlan(side);
+      plan = res.moves; comment = typeof res.comment === 'string' ? res.comment.slice(0, 80) : '';
+    } catch (e) {
+      addLog(`<span class="r">Claude</span> 応答なし（${escapeHtml(e && (e.code || e.message) || 'error')}）→ CPU が代行`);
+    }
+  }
+  if (!plan) plan = cpuPlan(side);
+  if (comment) addLog(`<span class="r">Claude</span>「${escapeHtml(comment)}」`);
+  S.thinking = false;
+  S.busy = false;
+  let applied = 0, rejected = 0;
+  for (const mv of plan) {
+    const p = S.pieces.find(q => q.id === Number(mv.id) && q.side === side);
+    if (p && legalMoves(p).some(c => c.x === Number(mv.x) && c.y === Number(mv.y))) {
+      S.busy = true;           // 人間のクリックを受け付けない
+      movePiece(p, Number(mv.x), Number(mv.y));
+      applied++;
+      if (speed() > 0) await wait(160 * speed());
+      S.busy = false;
+    } else rejected++;
+  }
+  S.history = [];
+  addLog(`<span class="r">${who === 'claude' && sampleFn ? 'Claude' : 'CPU'}</span> ${applied} 機移動` + (rejected ? `（不正な手 ${rejected} 件を無視）` : ''));
+  if (S.phase === 'red') endMove();
+}
+
+function escapeHtml(v) {
+  return String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 // ===================== 戦闘 =====================
@@ -525,6 +682,7 @@ const logEl = document.getElementById('log');
 const resultEl = document.getElementById('result');
 const speedSel = document.getElementById('opt-speed');
 const orderSel = document.getElementById('opt-order');
+const oppSel = document.getElementById('opt-opp');
 const skipBtn = document.getElementById('btn-skip');
 const inspectEl = document.getElementById('inspect');
 const cells = [];
@@ -576,7 +734,7 @@ function render() {
     if (y === SIDES.red.camp) cl.push('camp-red');
     if (y === SIDES.blue.camp) cl.push('camp-blue');
     const p = pieceAt(x, y);
-    if (p && !S.busy && p.side === S.phase) cl.push('own');
+    if (p && !S.busy && p.side === S.phase && !(p.side === 'red' && npc())) cl.push('own');
     if (sel && sel.x === x && sel.y === y) cl.push('sel');
     if (reachSet.has(y * W + x)) cl.push('reach', sel.side);
     if (rngFrom && Math.max(Math.abs(rngFrom.x - x), Math.abs(rngFrom.y - y)) <= rngR) cl.push('rng', sel.side);
@@ -593,18 +751,19 @@ function render() {
 
 function renderCmd(side) {
   const el = document.getElementById('cmd-' + side);
-  const active = S.phase === side && !S.busy;
+  const active = S.phase === side && !S.busy && !(side === 'red' && npc());
   const firing = S.phase === 'fire';
   el.classList.toggle('active', active || firing);
   const mine = S.pieces.filter(p => p.side === side);
   const nf = mine.filter(p => p.type === 'fighter').length;
   const np = mine.filter(p => p.type === 'patrol').length;
-  const state = active ? '移動フェーズ' : firing ? '戦闘中' : S.phase === 'over' ? '終了' : '待機中';
+  const npcSide = side === 'red' && npc();
+  const state = npcSide && S.phase === 'red' ? (S.thinking ? '思考中…' : '移動中') : active ? '移動フェーズ' : firing ? '戦闘中' : S.phase === 'over' ? '終了' : '待機中';
   const ap = active ? S.ap : (S.phase === side ? S.ap : S.n);
   let pips = '';
   for (let i = 0; i < S.n; i++) pips += `<span class="pip${i < ap ? ' full' : ''}"></span>`;
   el.innerHTML =
-    `<div class="who">${SIDES[side].player} · ${SIDES[side].jp}<span class="state">${state}</span></div>` +
+    `<div class="who">${npcSide ? (oppSel.value === 'claude' && sampleFn ? 'CLAUDE' : 'CPU') : SIDES[side].player} · ${SIDES[side].jp}<span class="state">${state}</span></div>` +
     `<div class="acts"><button type="button" data-act="undo" ${active && S.history.length ? '' : 'disabled'}>取り消し</button>` +
     `<button type="button" class="end ${side}" data-act="end" ${active ? '' : 'disabled'}>${side === 'blue' ? '移動終了' : '移動終了 → 戦闘'}</button></div>` +
     `<div class="ap">行動力 n <div class="pips">${pips}</div><b>${ap}/${S.n}</b>` +
@@ -669,7 +828,7 @@ function inspect(p) {
 // ===================== 入力 =====================
 boardEl.addEventListener('click', e => {
   const c = e.target.closest('.cell');
-  if (!c || S.busy || (S.phase !== 'blue' && S.phase !== 'red')) return;
+  if (!c || S.busy || (S.phase !== 'blue' && S.phase !== 'red') || (S.phase === 'red' && npc())) return;
   const x = +c.dataset.x, y = +c.dataset.y;
   const p = pieceAt(x, y);
   const sel = S.sel != null ? S.pieces.find(q => q.id === S.sel) : null;
@@ -716,8 +875,23 @@ document.getElementById('btn-again').addEventListener('click', startNew);
 skipBtn.addEventListener('click', () => { skip = true; skipBtn.disabled = true; });
 
 const flipChk = document.getElementById('opt-flip');
-const applyFlip = () => document.getElementById('cmd-red').classList.toggle('flip', flipChk.checked);
+const applyFlip = () => document.getElementById('cmd-red').classList.toggle('flip', flipChk.checked && !npc());
 flipChk.addEventListener('change', applyFlip);
+oppSel.addEventListener('change', () => {
+  applyFlip();
+  S.sel = null;
+  render();
+  if (S.phase === 'red' && !S.busy && npc()) runNpc();
+});
+// 公開版（claude.ai 上）では Claude に指し手を尋ねられる
+if (window.claude && typeof window.claude.use === 'function') {
+  window.claude.use('sample').then(fn => {
+    if (!fn) return;
+    sampleFn = fn;
+    oppSel.querySelector('option[value="claude"]').disabled = false;
+    render();
+  }).catch(() => {});
+}
 
 buildBoard();
 applyFlip();
