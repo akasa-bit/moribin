@@ -159,7 +159,7 @@ canvas#field {
           <thead><tr><th></th><th>速度</th><th>射程</th><th>スパン</th><th>a</th><th>e</th><th>b̄</th><th>d</th><th>c</th><th>費</th></tr></thead>
           <tbody id="stats-body"></tbody>
         </table>
-        <p class="note">スパンごとに射程内の敵<strong>全員</strong>を攻撃 ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
+        <p class="note">スパンごとに射程内の敵<strong>全員</strong>を攻撃（砲撃艦のみ最も近い 1 隻を狙撃） ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
       </div>
       <div class="box">
         <h2>設定</h2>
@@ -204,8 +204,8 @@ const F = 30;          // フィールドの一辺（マス単位）
 const CAMP = 1;        // 陣地の奥行き（上端＝赤、下端＝青。敵陣地には入れない）
 const DEPLOY = 8;      // 配置フェーズで艦を置ける範囲（自陣側の端からの距離）
 const DEPLOY_TIME = 60;
-const FLEET = { fighter: 12, patrol: 4, assault: 4, artillery: 2 };   // 標準編成（コスト 78）
-const COST = { fighter: 2, patrol: 5, assault: 6, artillery: 5 };     // 艦ごとの編成コスト
+const FLEET = { fighter: 16, assault: 5, artillery: 3 };   // 標準編成（コスト 77）
+const COST = { fighter: 2, assault: 6, artillery: 5 };     // 艦ごとの編成コスト
 const MAX_PER_TYPE = 30;
 const fleetCost = f => Object.keys(f).reduce((t, k) => t + f[k] * COST[k], 0);
 const budget = () => Number(budgetSel.value);
@@ -221,19 +221,19 @@ function autoFleet(b) {
 }
 // speed: マス/秒  range: 攻撃半径（マス）  span: 攻撃間隔（秒）  r: 艦の大きさ（衝突半径）
 const TYPES = {
-  fighter: { name: '攻撃機', speed: 0.5, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
-  patrol:  { name: '巡察艇', speed: 0.3, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
-  // 突撃艦：e・d は中程度、体力大、b が小さい（＝装甲が厚い）、巡察艇の 1.5 倍速
-  assault: { name: '突撃艦', speed: 0.45, range: 1.8, span: 1.6, a: 20, e: 100, bMean: 0.30, bSd: 0.25, d: 55, c: 45, r: 0.38 },
-  // 砲撃艦：長射程・高命中だが回避が低い。体力は低め、b は巡察艇と同じ、スパン長く移動は遅い
-  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, a: 25, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 17, r: 0.45 },
+  fighter: { name: '攻撃機', speed: 1.2, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
+  // 突撃艦：e・d は中程度、体力大、b が小さい（＝装甲が厚い）。砲撃艦の射程を素早く詰められる速さ
+  assault: { name: '突撃艦', speed: 1.0, range: 1.8, span: 1.6, a: 20, e: 100, bMean: 0.30, bSd: 0.25, d: 55, c: 45, r: 0.38 },
+  // 砲撃艦：長射程・高命中だが回避が低い。体力は低め、スパン長く移動は遅い。
+  //         射程内の全員ではなく最も近い 1 隻だけを狙撃する（splash: 着弾点から巻き込む半径。0 = 単体）
+  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, splash: 0, a: 40, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 17, r: 0.45 },
 };
-const SYM = { fighter: '●', patrol: '▲', assault: '◆', artillery: '■' };
+const SYM = { fighter: '●', assault: '◆', artillery: '■' };
 const SIDES = {
   blue: { player: 'PLAYER 1', jp: '青', enemy: 'red' },
   red:  { player: 'PLAYER 2', jp: '赤', enemy: 'blue' },
 };
-const WORTH = { fighter: 1, patrol: 2.5, assault: 3, artillery: 3.5 };
+const WORTH = { fighter: 1, assault: 3, artillery: 3.5 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -298,26 +298,23 @@ function formation(side, kind) {
     const c = clampPos(q, q.x, q.y); q.x = c.x; q.y = c.y;
   };
   const spread = (arr, dz, x0, x1) => arr.forEach((q, i) => put(q, arr.length === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (arr.length - 1), dz));
-  const F_ = by('fighter'), P = by('patrol'), A = by('assault'), R = by('artillery');
-  if (kind === 'layers') {        // 多層：突撃艦・攻撃機が前、巡察艇が中、砲撃艦が後ろ
-    spread(A, 6.8, 8, 22);
-    spread(F_, 5.6, 2, 28);
-    spread(P, 3.6, 6, 24);
-    spread(R, 1.6, 11, 19);
+  const F_ = by('fighter'), A = by('assault'), R = by('artillery');
+  if (kind === 'layers') {        // 多層：突撃艦が最前列、攻撃機が中、砲撃艦が後ろ
+    spread(A, 6.8, 6, 24);
+    spread(F_, 5.0, 2, 28);
+    spread(R, 1.8, 8, 22);
   } else if (kind === 'wedge') {  // 楔形：突撃艦を先頭に攻撃機が両翼へ広がる
     spread(A, 7.4, 13.2, 16.8);
     const half = Math.ceil(F_.length / 2);
     const sx = Math.min(1.7, 11 / Math.max(half, 1)), sy = Math.min(0.8, 5.2 / Math.max(half, 1));
     F_.slice(0, half).forEach((q, i) => put(q, 12.5 - i * sx, 6.6 - i * sy));
     F_.slice(half).forEach((q, i) => put(q, 17.5 + i * sx, 6.6 - i * sy));
-    spread(P, 4.4, 11, 19);
-    spread(R, 1.8, 13, 17);
-  } else {                        // 二列：前列に攻撃機と突撃艦、後列に巡察艇と砲撃艦
-    const front = [...F_], back = [...P];
+    spread(R, 2.2, 11, 19);
+  } else {                        // 二列：前列に攻撃機と突撃艦、後列に砲撃艦
+    const front = [...F_];
     A.forEach((q, i) => front.splice(2 + i * 4, 0, q));
-    R.forEach((q, i) => back.splice(i === 0 ? 1 : back.length - 1, 0, q));
     spread(front, 2.2, 1, 29);
-    spread(back, 0.8, 3, 27);
+    spread(R, 0.8, 5, 25);
   }
 }
 const humanSides = () => oppSel.value === 'human' ? ['blue', 'red'] : ['blue'];
@@ -412,8 +409,13 @@ function step(dt) {
     s.cd = Math.max(0, s.cd - dt);
     if (s.cd > 0) continue;
     const t = TYPES[s.type];
-    const targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(s, q) <= t.range);
+    let targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(s, q) <= t.range);
     if (!targets.length) continue;
+    // splash を持つ艦は、射程内の敵全員ではなく最も近い 1 隻に着弾し、その周囲 splash マス以内の敵も巻き込む
+    if (t.splash != null) {
+      const aim = targets.reduce((m, q) => dist(s, q) < dist(s, m) ? q : m);
+      targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(aim, q) <= t.splash);
+    }
     s.cd = t.span;
     for (const q of targets) {
       const qt = TYPES[q.type];
@@ -470,8 +472,8 @@ function endGame(winner) {
 }
 
 // ===================== CPU =====================
-// 各艦が「価値 ÷ 距離」の高い敵を狙う。巡察艇・砲撃艦は射程差を活かして近接艦から距離を取る
-const KEEP_AWAY = { patrol: 2.0, artillery: 3.2 };
+// 各艦が「価値 ÷ 距離」の高い敵を狙う。砲撃艦は射程差を活かして近接艦から距離を取る
+const KEEP_AWAY = { artillery: 3.2 };
 function cpuThink(side) {
   const foes = alive(SIDES[side].enemy);
   if (!foes.length) return;
@@ -516,7 +518,7 @@ function claudePrompt(side) {
 FIELD: continuous ${F}x${F} area, x = 0..${F} left to right, y = 0..${F} top to bottom. Red camp is y < ${CAMP} (top), blue camp is y > ${F - CAMP} (bottom). ${side} ships can never enter the enemy camp.
 SHIPS move in a straight line to the point you order.
 ${shipLines}
-Every shot hits ALL enemies inside the attack radius. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
+Every shot of fighters and assault ships hits ALL enemies inside the attack radius; artillery hits only the single NEAREST enemy in range. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
 Hit chances:
 ${hitLines}
 
@@ -644,8 +646,7 @@ function draw() {
     else {
       ctx.rotate(s.face);
       ctx.beginPath();
-      if (s.type === 'patrol') { ctx.moveTo(R * 1.15, 0); ctx.lineTo(-R * 0.8, R * 0.85); ctx.lineTo(-R * 0.8, -R * 0.85); }
-      else if (s.type === 'assault') { ctx.moveTo(R * 1.25, 0); ctx.lineTo(-R * 0.8, R * 0.95); ctx.lineTo(-R * 0.3, 0); ctx.lineTo(-R * 0.8, -R * 0.95); }
+      if (s.type === 'assault') { ctx.moveTo(R * 1.25, 0); ctx.lineTo(-R * 0.8, R * 0.95); ctx.lineTo(-R * 0.3, 0); ctx.lineTo(-R * 0.8, -R * 0.95); }
       else { ctx.rect(-R * 0.9, -R * 0.7, R * 1.6, R * 1.4); ctx.rect(R * 0.5, -R * 0.2, R * 0.9, R * 0.4); }
       ctx.closePath(); ctx.fill();
     }
