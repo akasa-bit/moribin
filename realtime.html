@@ -115,7 +115,7 @@ canvas#field {
   <header class="top">
     <div class="brand"><h1>星間戦線</h1><span>Real-time · 30 × 30 sector</span></div>
     <div class="clock">
-      <span>T+ <b id="clock">00:00</b></span>
+      <span><span id="clock-label">T+ </span><b id="clock">00:00</b></span>
       <button id="btn-pause" type="button">一時停止</button>
     </div>
   </header>
@@ -129,6 +129,7 @@ canvas#field {
           <div class="card">
             <h2 id="veil-title">出撃準備</h2>
             <ul id="veil-body">
+              <li>最初の <b>60 秒は配置フェーズ</b>。自陣側の点線より手前で艦をドラッグして陣形を組みます（多層・楔形・二列のプリセットあり）。双方が「準備完了」を押すと即開始</li>
               <li><b>自艦から指でなぞる</b>と、その線に沿って進みます</li>
               <li><b>空きスペースをドラッグ</b>で範囲選択。選択中の艦をなぞると編隊ごと移動</li>
               <li><b>艦をタップ</b>で選択に追加／解除</li>
@@ -184,19 +185,25 @@ canvas#field {
 
 // ===================== ルール定義 =====================
 const F = 30;          // フィールドの一辺（マス単位）
-const PER_SIDE = 20;   // 1陣営の艦数（陣地に等間隔で並べる）
 const CAMP = 1;        // 陣地の奥行き（上端＝赤、下端＝青。敵陣地には入れない）
+const DEPLOY = 8;      // 配置フェーズで艦を置ける範囲（自陣側の端からの距離）
+const DEPLOY_TIME = 60;
+const FLEET = { fighter: 12, patrol: 4, assault: 4, artillery: 2 };   // 1陣営の編成
 // speed: マス/秒  range: 攻撃半径（マス）  span: 攻撃間隔（秒）  r: 艦の大きさ（衝突半径）
 const TYPES = {
   fighter: { name: '攻撃機', speed: 0.5, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
   patrol:  { name: '巡察艇', speed: 0.3, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
+  // 突撃艦：e・d は中程度、体力大、b が小さい（＝装甲が厚い）、巡察艇の 1.5 倍速
+  assault: { name: '突撃艦', speed: 0.45, range: 1.8, span: 1.6, a: 20, e: 100, bMean: 0.30, bSd: 0.25, d: 55, c: 45, r: 0.38 },
+  // 砲撃艦：長射程・高命中だが回避が低い。体力大、b は巡察艇と同じ、スパン長く移動は遅い
+  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, a: 25, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 50, r: 0.45 },
 };
+const SYM = { fighter: '●', patrol: '▲', assault: '◆', artillery: '■' };
 const SIDES = {
   blue: { player: 'PLAYER 1', jp: '青', enemy: 'red' },
   red:  { player: 'PLAYER 2', jp: '赤', enemy: 'blue' },
 };
-const PATROL_COLS = [2, 6, 10, 14, 18];
-const WORTH = { fighter: 1, patrol: 2.5 };
+const WORTH = { fighter: 1, patrol: 2.5, assault: 3, artillery: 3.5 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -215,11 +222,9 @@ function newGame() {
   const ships = [];
   let id = 0;
   for (const side of ['blue', 'red']) {
-    for (let i = 0; i < PER_SIDE; i++) {
-      const viewCol = side === 'blue' ? i : PER_SIDE - 1 - i;
-      const type = PATROL_COLS.includes(viewCol) ? 'patrol' : 'fighter';
+    for (const [type, n] of Object.entries(FLEET)) for (let i = 0; i < n; i++) {
       ships.push({
-        id: id++, side, type, x: (i + 0.5) * F / PER_SIDE, y: side === 'blue' ? F - 0.5 : 0.5,
+        id: id++, side, type, x: F / 2, y: F / 2,
         hp: TYPES[type].c, cd: 0, path: [], face: side === 'blue' ? -Math.PI / 2 : Math.PI / 2,
         orderUntil: 0, dead: false,
       });
@@ -227,26 +232,67 @@ function newGame() {
   }
   S = {
     ships, time: 0, running: false, over: false,
+    phase: 'intro', deployT: DEPLOY_TIME, ready: { blue: false, red: false },
     sel: { blue: new Set(), red: new Set() },
     beams: [], floats: [], booms: [], gestures: new Map(),
     aiT: 0, claudeT: 3, claudePending: false,
   };
+  formation('blue', 'layers');
+  formation('red', 'layers');
   logEl.innerHTML = '';
   veilTitle.textContent = '出撃準備';
+  veilTitle.style.color = '';
   veilBody.hidden = false;
-  startBtn.textContent = '出撃';
+  startBtn.textContent = '配置を始める';
   veil.hidden = false;
   pauseBtn.disabled = true;
   renderHud();
 }
 
 const alive = side => S.ships.filter(s => s.side === side && !s.dead);
+
+// 陣形プリセット。座標は各陣営から見た向き（dz = 自陣側の端からの距離）で指定し、赤は上下左右を反転する
+function formation(side, kind) {
+  const mine = S.ships.filter(q => q.side === side);
+  const by = t => mine.filter(q => q.type === t);
+  const put = (q, x, dz) => {
+    q.x = side === 'blue' ? x : F - x;
+    q.y = side === 'blue' ? F - dz : dz;
+    q.path = [];
+    q.face = side === 'blue' ? -Math.PI / 2 : Math.PI / 2;
+    const c = clampPos(q, q.x, q.y); q.x = c.x; q.y = c.y;
+  };
+  const spread = (arr, dz, x0, x1) => arr.forEach((q, i) => put(q, arr.length === 1 ? (x0 + x1) / 2 : x0 + (x1 - x0) * i / (arr.length - 1), dz));
+  const F_ = by('fighter'), P = by('patrol'), A = by('assault'), R = by('artillery');
+  if (kind === 'layers') {        // 多層：突撃艦・攻撃機が前、巡察艇が中、砲撃艦が後ろ
+    spread(A, 6.8, 8, 22);
+    spread(F_, 5.6, 2, 28);
+    spread(P, 3.6, 6, 24);
+    spread(R, 1.6, 11, 19);
+  } else if (kind === 'wedge') {  // 楔形：突撃艦を先頭に攻撃機が両翼へ広がる
+    spread(A, 7.4, 13.2, 16.8);
+    const half = Math.ceil(F_.length / 2);
+    F_.slice(0, half).forEach((q, i) => put(q, 12.5 - i * 1.7, 6.6 - i * 0.8));
+    F_.slice(half).forEach((q, i) => put(q, 17.5 + i * 1.7, 6.6 - i * 0.8));
+    spread(P, 4.4, 11, 19);
+    spread(R, 1.8, 13, 17);
+  } else {                        // 二列：前列に攻撃機と突撃艦、後列に巡察艇と砲撃艦
+    const front = [...F_], back = [...P];
+    A.forEach((q, i) => front.splice(2 + i * 4, 0, q));
+    R.forEach((q, i) => back.splice(i === 0 ? 1 : back.length - 1, 0, q));
+    spread(front, 2.2, 1, 29);
+    spread(back, 0.8, 3, 27);
+  }
+}
 const humanSides = () => oppSel.value === 'human' ? ['blue', 'red'] : ['blue'];
 
 function clampPos(s, x, y) {
   const r = TYPES[s.type].r;
-  const lo = s.side === 'blue' ? CAMP + r : r;          // 青は赤陣地（上端）に入れない
-  const hi = s.side === 'red' ? F - CAMP - r : F - r;   // 赤は青陣地（下端）に入れない
+  let lo = s.side === 'blue' ? CAMP + r : r;            // 青は赤陣地（上端）に入れない
+  let hi = s.side === 'red' ? F - CAMP - r : F - r;     // 赤は青陣地（下端）に入れない
+  if (S && S.phase === 'deploy') {                     // 配置フェーズは自陣側の配置範囲のみ
+    if (s.side === 'blue') lo = F - DEPLOY + r; else hi = DEPLOY - r;
+  }
   return { x: clamp(x, r, F - r), y: clamp(y, lo, hi) };
 }
 
@@ -265,6 +311,39 @@ function assignPath(ships, pts) {
 }
 
 // ===================== シミュレーション =====================
+// 重なり防止
+function separate() {
+  for (let i = 0; i < S.ships.length; i++) for (let j = i + 1; j < S.ships.length; j++) {
+    const a = S.ships[i], b = S.ships[j];
+    const min = TYPES[a.type].r + TYPES[b.type].r;
+    let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+    if (d >= min) continue;
+    if (d < 1e-4) { dx = Math.random() - .5; dy = Math.random() - .5; d = Math.hypot(dx, dy); }
+    const push = (min - d) / 2;
+    a.x -= dx / d * push; a.y -= dy / d * push;
+    b.x += dx / d * push; b.y += dy / d * push;
+  }
+  for (const s of S.ships) { const c = clampPos(s, s.x, s.y); s.x = c.x; s.y = c.y; }
+}
+
+function startDeploy() {
+  S.phase = 'deploy';
+  S.deployT = DEPLOY_TIME;
+  S.ready = { blue: false, red: oppSel.value !== 'human' };
+  veil.hidden = true;
+  addLog('配置フェーズ開始');
+  renderHud();
+}
+
+function startBattle() {
+  S.phase = 'battle';
+  S.running = true;
+  for (const side of ['blue', 'red']) S.sel[side].clear();
+  pauseBtn.disabled = false;
+  pauseBtn.textContent = '一時停止';
+  addLog('<span class="k">戦闘開始</span>');
+  renderHud();
+}
 function step(dt) {
   S.time += dt;
 
@@ -277,18 +356,7 @@ function step(dt) {
     if (d <= mv) { s.x = p.x; s.y = p.y; s.path.shift(); }
     else { s.x += dx / d * mv; s.y += dy / d * mv; }
   }
-  // 重なり防止
-  for (let i = 0; i < S.ships.length; i++) for (let j = i + 1; j < S.ships.length; j++) {
-    const a = S.ships[i], b = S.ships[j];
-    const min = TYPES[a.type].r + TYPES[b.type].r;
-    let dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
-    if (d >= min) continue;
-    if (d < 1e-4) { dx = Math.random() - .5; dy = Math.random() - .5; d = Math.hypot(dx, dy); }
-    const push = (min - d) / 2;
-    a.x -= dx / d * push; a.y -= dy / d * push;
-    b.x += dx / d * push; b.y += dy / d * push;
-  }
-  for (const s of S.ships) { const c = clampPos(s, s.x, s.y); s.x = c.x; s.y = c.y; }
+  separate();
 
   // 自動攻撃：スパンごとに射程内の敵すべてを攻撃
   // 同じフレーム内で撃沈された艦も、そのフレームの攻撃は行う（処理順による有利不利をなくす）
@@ -302,7 +370,7 @@ function step(dt) {
     for (const q of targets) {
       const qt = TYPES[q.type];
       const hit = Math.random() < hitP(t, qt);
-      S.beams.push({ x1: s.x, y1: s.y, x2: q.x + (hit ? 0 : (Math.random() - .5) * .6), y2: q.y + (hit ? 0 : (Math.random() - .5) * .6), side: s.side, hit, t: 0 });
+      S.beams.push({ heavy: s.type === 'artillery', x1: s.x, y1: s.y, x2: q.x + (hit ? 0 : (Math.random() - .5) * .6), y2: q.y + (hit ? 0 : (Math.random() - .5) * .6), side: s.side, hit, t: 0 });
       if (!hit) { S.floats.push({ x: q.x, y: q.y, text: 'MISS', kind: 'miss', t: 0 }); continue; }
       const b = Math.max(0, gauss(qt.bMean, qt.bSd));   // 負の b は 0 に丸める
       const dmg = t.a * b;
@@ -310,7 +378,7 @@ function step(dt) {
       S.floats.push({ x: q.x, y: q.y, text: '−' + dmg.toFixed(1), kind: 'hit', t: 0 });
       if (q.hp < 0 && !q.dead) {
         q.dead = true;
-        S.booms.push({ x: q.x, y: q.y, t: 0, big: q.type === 'patrol' });
+        S.booms.push({ x: q.x, y: q.y, t: 0, big: qt.c >= 30 });
         addLog(`<span class="${q.side[0]}">${SIDES[q.side].jp} ${qt.name}</span> <span class="k">撃沈</span> ← <span class="${s.side[0]}">${t.name}</span>`);
       }
     }
@@ -343,7 +411,7 @@ function step(dt) {
 }
 
 function endGame(winner) {
-  S.over = true; S.running = false;
+  S.over = true; S.running = false; S.phase = 'over';
   pauseBtn.disabled = true;
   veilTitle.textContent = winner ? `${SIDES[winner].jp}艦隊の勝利` : '相討ち';
   veilTitle.style.color = winner ? `var(--${winner})` : 'var(--gold)';
@@ -354,7 +422,8 @@ function endGame(winner) {
 }
 
 // ===================== CPU =====================
-// 各艦が「価値 ÷ 距離」の高い敵を狙う。巡察艇は射程差を活かして攻撃機から距離を取る
+// 各艦が「価値 ÷ 距離」の高い敵を狙う。巡察艇・砲撃艦は射程差を活かして近接艦から距離を取る
+const KEEP_AWAY = { patrol: 2.0, artillery: 3.2 };
 function cpuThink(side) {
   const foes = alive(SIDES[side].enemy);
   if (!foes.length) return;
@@ -369,9 +438,9 @@ function cpuThink(side) {
       if (score > best) { best = score; target = q; }
     }
     let gx, gy;
-    if (s.type === 'patrol') {
-      const threat = foes.filter(q => q.type === 'fighter').sort((a, b) => dist(s, a) - dist(s, b))[0];
-      if (threat && dist(s, threat) < 2.0) {
+    if (KEEP_AWAY[s.type]) {
+      const threat = foes.filter(q => q.type === 'fighter' || q.type === 'assault').sort((a, b) => dist(s, a) - dist(s, b))[0];
+      if (threat && dist(s, threat) < KEEP_AWAY[s.type]) {
         const d = Math.max(dist(s, threat), 0.01);
         gx = s.x + (s.x - threat.x) / d * 1.5; gy = s.y + (s.y - threat.y) / d * 1.5;
       } else {
@@ -391,15 +460,17 @@ let sampleFn = null;
 
 function claudePrompt(side) {
   const fmt = arr => arr.map(s => `{"id":${s.id},"type":"${s.type}","x":${s.x.toFixed(1)},"y":${s.y.toFixed(1)},"hp":${s.hp.toFixed(1)}}`).join(',\n');
-  const Fi = TYPES.fighter, P = TYPES.patrol;
+  const kinds = Object.keys(TYPES);
+  const shipLines = kinds.map(k => { const t = TYPES[k]; return `- ${k}: speed ${t.speed}/s, attack radius ${t.range}, fires every ${t.span}s, a=${t.a}, e=${t.e}, d=${t.d}, max hp ${t.c}, b mean ${t.bMean}`; }).join('\n');
+  const hitLines = kinds.map(a => kinds.map(b => `${a}->${b} ${Math.round(hitP(TYPES[a], TYPES[b]) * 100)}%`).join(', ')).join('\n');
   return `You are the strategic commander of the ${side.toUpperCase()} fleet in a REAL-TIME 2D space battle. The game keeps running while you think; you are consulted about every 15 seconds and your orders last until the next consultation. Ships you give no order to are driven by a simple autopilot that chases the most valuable nearby target.
 
 FIELD: continuous ${F}x${F} area, x = 0..${F} left to right, y = 0..${F} top to bottom. Red camp is y < ${CAMP} (top), blue camp is y > ${F - CAMP} (bottom). ${side} ships can never enter the enemy camp.
 SHIPS move in a straight line to the point you order.
-- fighter: speed ${Fi.speed}/s, attack radius ${Fi.range}, fires every ${Fi.span}s, a=${Fi.a}, e=${Fi.e}, d=${Fi.d}, max hp ${Fi.c}, b mean ${Fi.bMean}
-- patrol : speed ${P.speed}/s, attack radius ${P.range}, fires every ${P.span}s, a=${P.a}, e=${P.e}, d=${P.d}, max hp ${P.c}, b mean ${P.bMean}
+${shipLines}
 Every shot hits ALL enemies inside the attack radius. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
-Hit chances: fighter->patrol ${Math.round(hitP(Fi, P) * 100)}%, fighter->fighter ${Math.round(hitP(Fi, Fi) * 100)}%, patrol->fighter ${Math.round(hitP(P, Fi) * 100)}%, patrol->patrol ${Math.round(hitP(P, P) * 100)}%.
+Hit chances:
+${hitLines}
 
 TIME t=${S.time.toFixed(0)}s.
 YOUR ships (${side}):
@@ -479,6 +550,17 @@ function draw() {
   // 陣地
   ctx.fillStyle = 'rgba(255, 92, 99, .10)'; ctx.fillRect(0, 0, F * u, CAMP * u);
   ctx.fillStyle = 'rgba(78, 162, 255, .10)'; ctx.fillRect(0, (F - CAMP) * u, F * u, CAMP * u);
+  // 配置範囲
+  if (S.phase === 'deploy') {
+    ctx.fillStyle = 'rgba(255, 92, 99, .06)'; ctx.fillRect(0, 0, F * u, DEPLOY * u);
+    ctx.fillStyle = 'rgba(78, 162, 255, .06)'; ctx.fillRect(0, (F - DEPLOY) * u, F * u, DEPLOY * u);
+    ctx.setLineDash([6, 5]); ctx.lineWidth = 1;
+    for (const [side, y] of [['red', DEPLOY], ['blue', F - DEPLOY]]) {
+      ctx.strokeStyle = COL[side]; ctx.globalAlpha = .6;
+      ctx.beginPath(); ctx.moveTo(0, y * u); ctx.lineTo(F * u, y * u); ctx.stroke();
+    }
+    ctx.globalAlpha = 1; ctx.setLineDash([]);
+  }
   // 目盛り（座標感覚のための点）
   ctx.fillStyle = COL.line;
   for (let y = 1; y < F; y++) for (let x = 1; x < F; x++) ctx.fillRect(x * u - 1, y * u - 1, 2, 2);
@@ -512,7 +594,11 @@ function draw() {
     if (s.type === 'fighter') { ctx.beginPath(); ctx.arc(0, 0, R * 0.85, 0, Math.PI * 2); ctx.fill(); }
     else {
       ctx.rotate(s.face);
-      ctx.beginPath(); ctx.moveTo(R * 1.15, 0); ctx.lineTo(-R * 0.8, R * 0.85); ctx.lineTo(-R * 0.8, -R * 0.85); ctx.closePath(); ctx.fill();
+      ctx.beginPath();
+      if (s.type === 'patrol') { ctx.moveTo(R * 1.15, 0); ctx.lineTo(-R * 0.8, R * 0.85); ctx.lineTo(-R * 0.8, -R * 0.85); }
+      else if (s.type === 'assault') { ctx.moveTo(R * 1.25, 0); ctx.lineTo(-R * 0.8, R * 0.95); ctx.lineTo(-R * 0.3, 0); ctx.lineTo(-R * 0.8, -R * 0.95); }
+      else { ctx.rect(-R * 0.9, -R * 0.7, R * 1.6, R * 1.4); ctx.rect(R * 0.5, -R * 0.2, R * 0.9, R * 0.4); }
+      ctx.closePath(); ctx.fill();
     }
     ctx.restore();
     // 体力バー
@@ -524,7 +610,7 @@ function draw() {
   // 攻撃
   for (const b of S.beams) {
     ctx.globalAlpha = 1 - b.t / 0.3;
-    ctx.strokeStyle = COL[b.side]; ctx.lineWidth = b.hit ? 2 : 1;
+    ctx.strokeStyle = COL[b.side]; ctx.lineWidth = (b.hit ? 2 : 1) + (b.heavy ? 1.5 : 0);
     if (!b.hit) ctx.setLineDash([3, 3]);
     ctx.beginPath(); ctx.moveTo(b.x1 * u, b.y1 * u); ctx.lineTo(b.x2 * u, b.y2 * u); ctx.stroke();
     ctx.setLineDash([]);
@@ -545,6 +631,7 @@ function draw() {
   // 入力中のジェスチャ
   for (const g of S.gestures.values()) {
     ctx.strokeStyle = COL[g.side]; ctx.lineWidth = 2;
+    if (g.kind === 'drag') continue;
     if (g.kind === 'box') {
       ctx.setLineDash([5, 4]);
       ctx.strokeRect(Math.min(g.x0, g.x1) * u, Math.min(g.y0, g.y1) * u, Math.abs(g.x1 - g.x0) * u, Math.abs(g.y1 - g.y0) * u);
@@ -569,14 +656,17 @@ function renderHud() {
     const npc = side === 'red' && oppSel.value !== 'human';
     const name = npc ? (oppSel.value === 'claude' && sampleFn ? 'CLAUDE' : 'CPU') : SIDES[side].player;
     el.classList.toggle('flip', side === 'red' && flipChk.checked && oppSel.value === 'human');
-    el.innerHTML =
-      `<div class="who">${name} · ${SIDES[side].jp}<span class="fleet">● ${mine.filter(s => s.type === 'fighter').length}　▲ ${mine.filter(s => s.type === 'patrol').length}</span></div>` +
-      (npc ? '' : `<div class="acts">` +
-        `<button type="button" data-side="${side}" data-act="all">全艦選択</button>` +
-        `<button type="button" data-side="${side}" data-act="fighters">攻撃機</button>` +
-        `<button type="button" data-side="${side}" data-act="patrols">巡察艇</button>` +
-        `<button type="button" data-side="${side}" data-act="halt">停止</button>` +
-        `<button type="button" data-side="${side}" data-act="clear">解除</button></div>`);
+    const counts = Object.keys(TYPES).map(k => `${SYM[k]} ${mine.filter(s => s.type === k).length}`).join('　');
+    const btn = (act, label, extra = '') => `<button type="button" data-side="${side}" data-act="${act}"${extra}>${label}</button>`;
+    let acts = '';
+    if (!npc && S.phase === 'deploy') {
+      acts = btn('form-layers', '多層') + btn('form-wedge', '楔形') + btn('form-rows', '二列') + btn('all', '全艦') + btn('clear', '解除') +
+        btn('ready', S.ready[side] ? '準備完了 ✓' : '準備完了', S.ready[side] ? ' class="primary"' : '');
+    } else if (!npc) {
+      acts = btn('all', '全艦') + Object.keys(TYPES).map(k => btn('type-' + k, SYM[k], ` title="${TYPES[k].name}を選択"`)).join('') +
+        btn('halt', '停止') + btn('clear', '解除');
+    } else if (S.phase === 'deploy') acts = '<span class="fleet">配置完了</span>';
+    el.innerHTML = `<div class="who">${name} · ${SIDES[side].jp}<span class="fleet">${counts}</span></div>` + (acts ? `<div class="acts">${acts}</div>` : '');
   }
 }
 
@@ -587,8 +677,8 @@ function addLog(html) {
   while (logEl.children.length > 200) logEl.lastChild.remove();
 }
 
-document.getElementById('stats-body').innerHTML = Object.values(TYPES).map((t, i) =>
-  `<tr><td>${i ? '▲' : '●'} ${t.name}</td><td>${t.speed}</td><td>${t.range}</td><td>${t.span}s</td><td>${t.a}</td><td>${t.e}</td><td>${t.bMean}</td><td>${t.d}</td><td>${t.c}</td></tr>`).join('');
+document.getElementById('stats-body').innerHTML = Object.entries(TYPES).map(([k, t]) =>
+  `<tr><td>${SYM[k]} ${t.name}</td><td>${t.speed}</td><td>${t.range}</td><td>${t.span}s</td><td>${t.a}</td><td>${t.e}</td><td>${t.bMean}</td><td>${t.d}</td><td>${t.c}</td></tr>`).join('');
 
 // ===================== 入力（マルチタッチ対応：2人が同時に操作できる） =====================
 function toField(e) {
@@ -597,7 +687,7 @@ function toField(e) {
 }
 
 canvas.addEventListener('pointerdown', e => {
-  if (!S.running) return;
+  if (!S.running && S.phase !== 'deploy') return;
   const p = toField(e);
   const sides = humanSides();
   let hit = null, hd = Infinity;
@@ -607,7 +697,11 @@ canvas.addEventListener('pointerdown', e => {
     if (d < Math.max(TYPES[s.type].r + 0.3, 0.55) && d < hd) { hit = s; hd = d; }
   }
   canvas.setPointerCapture(e.pointerId);
-  if (hit) {
+  if (hit && S.phase === 'deploy') {           // 配置フェーズ：艦（選択中なら編隊ごと）を直接つかんで動かす
+    if (S.ready[hit.side]) return;
+    const group = S.sel[hit.side].has(hit) ? [...S.sel[hit.side]] : [hit];
+    S.gestures.set(e.pointerId, { kind: 'drag', side: hit.side, hit, ships: group, start: p, orig: group.map(q => ({ q, x: q.x, y: q.y })), len: 0 });
+  } else if (hit) {
     const group = S.sel[hit.side].has(hit) ? [...S.sel[hit.side]] : [hit];
     S.gestures.set(e.pointerId, { kind: 'path', side: hit.side, hit, ships: group, pts: [p], len: 0 });
   } else {
@@ -621,6 +715,12 @@ canvas.addEventListener('pointermove', e => {
   if (!g) return;
   const p = toField(e);
   if (g.kind === 'box') { g.x1 = p.x; g.y1 = p.y; return; }
+  if (g.kind === 'drag') {
+    const dx = p.x - g.start.x, dy = p.y - g.start.y;
+    g.len = Math.max(g.len, Math.hypot(dx, dy));
+    for (const o of g.orig) { const c = clampPos(o.q, o.x + dx, o.y + dy); o.q.x = c.x; o.q.y = c.y; }
+    return;
+  }
   const last = g.pts[g.pts.length - 1];
   const d = dist(last, p);
   if (d > 0.18) { g.pts.push(p); g.len += d; }
@@ -631,7 +731,10 @@ function finishGesture(e) {
   if (!g) return;
   S.gestures.delete(e.pointerId);
   const sel = S.sel[g.side];
-  if (g.kind === 'path') {
+  if (g.kind === 'drag') {
+    if (g.len < 0.35) { if (sel.has(g.hit)) sel.delete(g.hit); else sel.add(g.hit); }
+    separate();
+  } else if (g.kind === 'path') {
     if (g.len < 0.35) {                        // タップ：選択に追加／解除
       if (sel.has(g.hit)) sel.delete(g.hit); else sel.add(g.hit);
     } else {
@@ -654,18 +757,21 @@ document.addEventListener('click', e => {
   if (!b) return;
   const side = b.dataset.side, sel = S.sel[side], mine = alive(side);
   if (b.dataset.act === 'all') { sel.clear(); mine.forEach(s => sel.add(s)); }
-  if (b.dataset.act === 'fighters') { sel.clear(); mine.filter(s => s.type === 'fighter').forEach(s => sel.add(s)); }
-  if (b.dataset.act === 'patrols') { sel.clear(); mine.filter(s => s.type === 'patrol').forEach(s => sel.add(s)); }
+  const act = b.dataset.act;
+  if (act.startsWith('type-')) { sel.clear(); mine.filter(s => s.type === act.slice(5)).forEach(s => sel.add(s)); }
+  if (act.startsWith('form-') && S.phase === 'deploy' && !S.ready[side]) { formation(side, act.slice(5)); separate(); }
+  if (act === 'ready' && S.phase === 'deploy') {
+    S.ready[side] = !S.ready[side];
+    if (S.ready[side]) sel.clear();
+    if (S.ready.blue && S.ready.red) startBattle(); else renderHud();
+  }
   if (b.dataset.act === 'halt') (sel.size ? [...sel] : mine).forEach(s => { s.path = []; });
   if (b.dataset.act === 'clear') sel.clear();
 });
 
 startBtn.addEventListener('click', () => {
   if (S.over) newGame();
-  veil.hidden = true;
-  S.running = true;
-  pauseBtn.disabled = false;
-  pauseBtn.textContent = '一時停止';
+  startDeploy();
 });
 pauseBtn.addEventListener('click', togglePause);
 function togglePause() {
@@ -677,7 +783,12 @@ document.addEventListener('keydown', e => {
   if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); togglePause(); }
 });
 document.getElementById('btn-new').addEventListener('click', newGame);
-oppSel.addEventListener('change', () => { S.sel.red.clear(); renderHud(); });
+oppSel.addEventListener('change', () => {
+  S.sel.red.clear();
+  if (S.phase === 'deploy' && oppSel.value !== 'human') { formation('red', 'layers'); S.ready.red = true; if (S.ready.blue) { startBattle(); return; } }
+  if (S.phase === 'deploy' && oppSel.value === 'human') S.ready.red = false;
+  renderHud();
+});
 flipChk.addEventListener('change', renderHud);
 
 if (window.claude && typeof window.claude.use === 'function') {
@@ -694,9 +805,15 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
-  if (S.running) {
+  const clockEl = document.getElementById('clock');
+  document.getElementById('clock-label').hidden = S.phase === 'deploy';
+  if (S.phase === 'deploy') {
+    S.deployT -= dt;
+    clockEl.textContent = '配置 ' + fmtTime(Math.max(0, Math.ceil(S.deployT)));
+    if (S.deployT <= 0) startBattle();
+  } else if (S.running) {
     step(dt * Number(speedSel.value));
-    document.getElementById('clock').textContent = fmtTime(S.time);
+    clockEl.textContent = fmtTime(S.time);
   }
   draw();
   requestAnimationFrame(frame);
