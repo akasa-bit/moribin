@@ -76,6 +76,7 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 }
 .phases li.on.blue { border-color: var(--blue); color: var(--blue); background: var(--blue-dim); }
 .phases li.on.red { border-color: var(--red); color: var(--red); background: var(--red-dim); }
+.phases li.on.fire { border-color: var(--gold); color: var(--gold); background: rgba(255, 209, 102, .12); }
 .turnno { font: 600 13px var(--f-mono); color: var(--muted); }
 .turnno b { color: var(--ink); font-size: 18px; }
 
@@ -144,6 +145,7 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 .cell.own { cursor: pointer; }
 .piece { position: absolute; inset: 0; width: 100%; height: 100%; transition: opacity .2s; }
 .piece.moved { opacity: .42; }
+.piece.dead { opacity: .18; }
 .cell.sel { outline: 2px solid var(--gold); outline-offset: -2px; z-index: 1; }
 .cell.firing .piece { filter: drop-shadow(0 0 4px var(--gold)); }
 .fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
@@ -213,8 +215,7 @@ button:disabled { opacity: .35; cursor: not-allowed; }
     <ol class="phases" id="phases">
       <li class="blue" data-p="blue">① 青 移動</li>
       <li class="red" data-p="red">② 赤 移動</li>
-      <li class="red" data-p="fire-red">③ 赤 攻撃</li>
-      <li class="blue" data-p="fire-blue">④ 青 攻撃</li>
+      <li class="fire" data-p="fire">③ 戦闘</li>
     </ol>
     <div class="turnno">TURN <b id="turn">1</b></div>
   </header>
@@ -239,8 +240,8 @@ button:disabled { opacity: .35; cursor: not-allowed; }
         <table>
           <thead><tr><th></th><th>移動</th><th>m</th><th>射程</th><th>a</th><th>e</th><th>b 平均±σ</th><th>d</th><th>c</th></tr></thead>
           <tbody>
-            <tr><td>● 攻撃機</td><td>11×11</td><td>1</td><td>3×3</td><td>10</td><td>100</td><td>0.75±0.25</td><td>50</td><td>10</td></tr>
-            <tr><td>▲ 巡察艇</td><td>3×3</td><td>2</td><td>5×5</td><td>20</td><td>90</td><td>0.50±0.25</td><td>40</td><td>30</td></tr>
+            <tr><td>● 攻撃機</td><td>11×11</td><td>1</td><td>3×3</td><td>10</td><td>100</td><td>0.75±0.25</td><td>70</td><td>10</td></tr>
+            <tr><td>▲ 巡察艇</td><td>7×7</td><td>2</td><td>5×5</td><td>20</td><td>90</td><td>0.50±0.25</td><td>40</td><td>30</td></tr>
           </tbody>
         </table>
         <p class="formula">命中率 <code>(e − d) / 100</code> ・ 命中時 <code>c ← c − a × b</code> ・ <code>c &lt; 0</code> で撃沈</p>
@@ -250,6 +251,12 @@ button:disabled { opacity: .35; cursor: not-allowed; }
         <div class="settings">
           <label for="opt-n">行動力 n</label>
           <input id="opt-n" type="number" min="1" max="40" value="10">
+          <label for="opt-order">攻撃順</label>
+          <select id="opt-order">
+            <option value="sim">同時</option>
+            <option value="alt">駒ごとに交代</option>
+            <option value="random">ランダム</option>
+          </select>
           <label for="opt-speed">戦闘演出</label>
           <select id="opt-speed">
             <option value="1">通常</option>
@@ -286,11 +293,11 @@ button:disabled { opacity: .35; cursor: not-allowed; }
 const W = 20, H = 20;
 const COLS = 'ABCDEFGHIJKLMNOPQRST';
 
-// move: 移動できる近隣マスの半径 (5 → 11×11, 1 → 3×3)
+// move: 移動できる近隣マスの半径 (5 → 11×11, 3 → 7×7)
 // range: 攻撃が届く近隣マスの半径 (1 → 3×3, 2 → 5×5)
 const TYPES = {
-  fighter: { name: '攻撃機', move: 5, m: 1, range: 1, a: 10, e: 100, bMean: 0.75, bSd: 0.25, d: 50, c: 10 },
-  patrol:  { name: '巡察艇', move: 1, m: 2, range: 2, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30 },
+  fighter: { name: '攻撃機', move: 5, m: 1, range: 1, a: 10, e: 100, bMean: 0.75, bSd: 0.25, d: 70, c: 10 },
+  patrol:  { name: '巡察艇', move: 3, m: 2, range: 2, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30 },
 };
 
 const SIDES = {
@@ -389,17 +396,49 @@ function endMove() {
 const wait = ms => new Promise(r => setTimeout(r, ms));
 const speed = () => Number(speedSel.value);
 
+// 攻撃順モード
+//   sim    : 同時 — 戦闘開始時点の配置で全コマが攻撃し、撃沈は最後にまとめて反映
+//   alt    : 駒ごとに交代 — 赤青1機ずつ交互に攻撃（先手はターンごとに入れ替え）
+//   random : ランダム — 両軍の全コマをシャッフルした順に攻撃
+const ORDER_LABEL = { sim: '同時', alt: '駒ごとに交代', random: 'ランダム' };
+
+function shuffle(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function attackOrder(mode) {
+  const bySide = side => S.pieces.filter(p => p.side === side).sort((a, b) => a.id - b.id);
+  if (mode === 'random') return shuffle(S.pieces.slice());
+  if (mode === 'alt') {
+    // 奇数ターンは青、偶数ターンは赤が先手
+    const first = S.turn % 2 === 1 ? 'blue' : 'red';
+    const a = bySide(first), b = bySide(SIDES[first].enemy), out = [];
+    for (let i = 0; i < Math.max(a.length, b.length); i++) {
+      if (a[i]) out.push(a[i]);
+      if (b[i]) out.push(b[i]);
+    }
+    return out;
+  }
+  // sim: 順序は結果に影響しないので、演出が見やすいよう交互に並べる
+  return attackOrder('alt');
+}
+
 async function combat() {
   S.busy = true;
   skipBtn.disabled = speed() === 0;
-  for (const side of ['red', 'blue']) {
-    S.phase = 'fire-' + side;
-    addLog(`<span class="h">TURN ${S.turn} ― ${SIDES[side].jp}の攻撃</span>`, true);
-    render();
-    await firePhase(side);
-    render();
-    if (checkWin()) { S.busy = false; skipBtn.disabled = true; return; }
-  }
+  const mode = orderSel.value;
+  S.phase = 'fire';
+  let note = '';
+  if (mode === 'alt') note = `（${SIDES[S.turn % 2 === 1 ? 'blue' : 'red'].jp}が先手）`;
+  addLog(`<span class="h">TURN ${S.turn} ― 戦闘：${ORDER_LABEL[mode]}${note}</span>`, true);
+  render();
+  await firePhase(attackOrder(mode), mode === 'sim');
+  render();
+  if (checkWin()) { S.busy = false; skipBtn.disabled = true; return; }
   S.turn++;
   S.phase = 'blue';
   S.ap = S.n;
@@ -411,20 +450,21 @@ async function combat() {
   render();
 }
 
-async function firePhase(side) {
-  const attackers = S.pieces.filter(p => p.side === side).sort((a, b) => a.id - b.id);
-  const cls = side === 'blue' ? 'b' : 'r';
-  const ecls = side === 'blue' ? 'r' : 'b';
-  for (const atk of attackers) {
+// deferKills = true のとき、撃沈されたコマも戦闘終了まで攻撃し続け、最後にまとめて除去する
+async function firePhase(order, deferKills) {
+  for (const atk of order) {
     if (!S.pieces.includes(atk)) continue;
     const t = TYPES[atk.type];
-    const targets = S.pieces.filter(q => q.side !== side && cheb(atk, q) <= t.range);
+    const targets = S.pieces.filter(q => q.side !== atk.side && cheb(atk, q) <= t.range);
     if (!targets.length) continue;
+    const cls = atk.side === 'blue' ? 'b' : 'r';
+    const ecls = atk.side === 'blue' ? 'r' : 'b';
 
     const results = targets.map(q => {
       const qt = TYPES[q.type];
       const pHit = clamp((t.e - qt.d) / 100, 0, 1);
       const hit = Math.random() < pHit;
+      const wasAlive = q.hp >= 0;
       let b = null, dmg = 0;
       if (hit) {
         // 防御力 b は被攻撃ごとに正規分布で変動（負値は 0 に丸める）
@@ -432,7 +472,7 @@ async function firePhase(side) {
         dmg = t.a * b;
         q.hp -= dmg;
       }
-      return { q, hit, b, dmg, pHit, killed: q.hp < 0 };
+      return { q, hit, b, dmg, pHit, killed: wasAlive && q.hp < 0 };
     });
 
     for (const r of results) {
@@ -448,12 +488,13 @@ async function firePhase(side) {
       showFire(atk, results);
       render();
     }
-    S.pieces = S.pieces.filter(p => !results.some(r => r.killed && r.q === p));
+    if (!deferKills) S.pieces = S.pieces.filter(p => p.hp >= 0);
     if (sp > 0) {
       await wait(420 * sp);
       render();
     }
   }
+  S.pieces = S.pieces.filter(p => p.hp >= 0);
 }
 
 function checkWin() {
@@ -483,6 +524,7 @@ const wrapEl = boardEl.parentElement;
 const logEl = document.getElementById('log');
 const resultEl = document.getElementById('result');
 const speedSel = document.getElementById('opt-speed');
+const orderSel = document.getElementById('opt-order');
 const skipBtn = document.getElementById('btn-skip');
 const inspectEl = document.getElementById('inspect');
 const cells = [];
@@ -516,7 +558,7 @@ function pieceSVG(p) {
     ? `<polygon points="10,2.5 16.5,14 3.5,14" fill="${col}"/>`
     : `<polygon points="10,15.5 16.5,4 3.5,4" fill="${col}"/>`;
   const barY = p.side === 'blue' ? 16.4 : 16.4;
-  return `<svg class="piece${p.moved ? ' moved' : ''}" viewBox="0 0 20 20" aria-hidden="true">${shape}` +
+  return `<svg class="piece${p.hp < 0 ? ' dead' : p.moved ? ' moved' : ''}" viewBox="0 0 20 20" aria-hidden="true">${shape}` +
     `<rect x="3" y="${barY}" width="14" height="1.6" fill="#ffffff22"/>` +
     `<rect x="3" y="${barY}" width="${hpw.toFixed(2)}" height="1.6" fill="${col}"/></svg>`;
 }
@@ -552,12 +594,12 @@ function render() {
 function renderCmd(side) {
   const el = document.getElementById('cmd-' + side);
   const active = S.phase === side && !S.busy;
-  const firing = S.phase === 'fire-' + side;
+  const firing = S.phase === 'fire';
   el.classList.toggle('active', active || firing);
   const mine = S.pieces.filter(p => p.side === side);
   const nf = mine.filter(p => p.type === 'fighter').length;
   const np = mine.filter(p => p.type === 'patrol').length;
-  const state = active ? '移動フェーズ' : firing ? '自動攻撃中' : S.phase === 'over' ? '終了' : '待機中';
+  const state = active ? '移動フェーズ' : firing ? '戦闘中' : S.phase === 'over' ? '終了' : '待機中';
   const ap = active ? S.ap : (S.phase === side ? S.ap : S.n);
   let pips = '';
   for (let i = 0; i < S.n; i++) pips += `<span class="pip${i < ap ? ' full' : ''}"></span>`;
