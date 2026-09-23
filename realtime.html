@@ -91,8 +91,8 @@ canvas#field {
 .box { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
 .box h2 { margin: 0 0 8px; font: 700 12px var(--f-display); letter-spacing: .2em; color: var(--muted); text-transform: uppercase; }
 .stats { overflow-x: auto; }
-.stats table { border-collapse: collapse; width: 100%; font-size: 12px; }
-.stats th, .stats td { padding: 3px 5px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.stats table { border-collapse: collapse; width: 100%; font-size: 11px; }
+.stats th, .stats td { padding: 3px 3px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .stats th:first-child, .stats td:first-child { text-align: left; }
 .stats thead th { color: var(--muted); font-weight: 500; font-family: var(--f-mono); }
 .stats td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
@@ -113,7 +113,7 @@ canvas#field {
 <body>
 <div class="app">
   <header class="top">
-    <div class="brand"><h1>星間戦線</h1><span>Real-time · 20 × 20 sector</span></div>
+    <div class="brand"><h1>星間戦線</h1><span>Real-time · 30 × 30 sector</span></div>
     <div class="clock">
       <span>T+ <b id="clock">00:00</b></span>
       <button id="btn-pause" type="button">一時停止</button>
@@ -183,12 +183,13 @@ canvas#field {
 'use strict';
 
 // ===================== ルール定義 =====================
-const F = 20;          // フィールドの一辺（マス単位）
+const F = 30;          // フィールドの一辺（マス単位）
+const PER_SIDE = 20;   // 1陣営の艦数（陣地に等間隔で並べる）
 const CAMP = 1;        // 陣地の奥行き（上端＝赤、下端＝青。敵陣地には入れない）
 // speed: マス/秒  range: 攻撃半径（マス）  span: 攻撃間隔（秒）  r: 艦の大きさ（衝突半径）
 const TYPES = {
-  fighter: { name: '攻撃機', speed: 1.6, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
-  patrol:  { name: '巡察艇', speed: 1.0, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
+  fighter: { name: '攻撃機', speed: 0.5, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
+  patrol:  { name: '巡察艇', speed: 0.3, range: 2.5, span: 1.6, a: 20, e: 90,  bMean: 0.50, bSd: 0.25, d: 40, c: 30, r: 0.38 },
 };
 const SIDES = {
   blue: { player: 'PLAYER 1', jp: '青', enemy: 'red' },
@@ -214,11 +215,11 @@ function newGame() {
   const ships = [];
   let id = 0;
   for (const side of ['blue', 'red']) {
-    for (let i = 0; i < F; i++) {
-      const viewCol = side === 'blue' ? i : F - 1 - i;
+    for (let i = 0; i < PER_SIDE; i++) {
+      const viewCol = side === 'blue' ? i : PER_SIDE - 1 - i;
       const type = PATROL_COLS.includes(viewCol) ? 'patrol' : 'fighter';
       ships.push({
-        id: id++, side, type, x: i + 0.5, y: side === 'blue' ? F - 0.5 : 0.5,
+        id: id++, side, type, x: (i + 0.5) * F / PER_SIDE, y: side === 'blue' ? F - 0.5 : 0.5,
         hp: TYPES[type].c, cd: 0, path: [], face: side === 'blue' ? -Math.PI / 2 : Math.PI / 2,
         orderUntil: 0, dead: false,
       });
@@ -290,8 +291,8 @@ function step(dt) {
   for (const s of S.ships) { const c = clampPos(s, s.x, s.y); s.x = c.x; s.y = c.y; }
 
   // 自動攻撃：スパンごとに射程内の敵すべてを攻撃
+  // 同じフレーム内で撃沈された艦も、そのフレームの攻撃は行う（処理順による有利不利をなくす）
   for (const s of S.ships) {
-    if (s.dead) continue;
     s.cd = Math.max(0, s.cd - dt);
     if (s.cd > 0) continue;
     const t = TYPES[s.type];
@@ -393,7 +394,7 @@ function claudePrompt(side) {
   const Fi = TYPES.fighter, P = TYPES.patrol;
   return `You are the strategic commander of the ${side.toUpperCase()} fleet in a REAL-TIME 2D space battle. The game keeps running while you think; you are consulted about every 15 seconds and your orders last until the next consultation. Ships you give no order to are driven by a simple autopilot that chases the most valuable nearby target.
 
-FIELD: continuous 20x20 area, x = 0..20 left to right, y = 0..20 top to bottom. Red camp is y < 1 (top), blue camp is y > 19 (bottom). ${side} ships can never enter the enemy camp.
+FIELD: continuous ${F}x${F} area, x = 0..${F} left to right, y = 0..${F} top to bottom. Red camp is y < ${CAMP} (top), blue camp is y > ${F - CAMP} (bottom). ${side} ships can never enter the enemy camp.
 SHIPS move in a straight line to the point you order.
 - fighter: speed ${Fi.speed}/s, attack radius ${Fi.range}, fires every ${Fi.span}s, a=${Fi.a}, e=${Fi.e}, d=${Fi.d}, max hp ${Fi.c}, b mean ${Fi.bMean}
 - patrol : speed ${P.speed}/s, attack radius ${P.range}, fires every ${P.span}s, a=${P.a}, e=${P.e}, d=${P.d}, max hp ${P.c}, b mean ${P.bMean}
@@ -461,7 +462,7 @@ const COL = { blue: css('--blue'), red: css('--red'), gold: css('--gold'), line:
 let unit = 30, dpr = 1;
 
 function resize() {
-  const avail = Math.min(wrap.clientWidth, Math.max(300, window.innerHeight - 190), 760);
+  const avail = Math.min(wrap.clientWidth, Math.max(300, window.innerHeight - 190), 900);
   dpr = window.devicePixelRatio || 1;
   canvas.style.width = avail + 'px';
   canvas.style.height = avail + 'px';
