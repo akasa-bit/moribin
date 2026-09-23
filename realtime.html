@@ -143,7 +143,7 @@ canvas#field {
               <li><b>自艦から指でなぞる</b>と、その線に沿って進みます</li>
               <li><b>空きスペースをドラッグ</b>で範囲選択。選択中の艦をなぞると編隊ごと移動</li>
               <li><b>艦をタップ</b>で選択に追加／解除</li>
-              <li>射程内に敵が入ると、攻撃スパンごとに自動で攻撃します</li>
+              <li>射程内に敵が入ると、攻撃スパンごとに最も近い 1 隻を自動で攻撃します</li>
             </ul>
             <button class="primary" id="btn-start" type="button">出撃</button>
           </div>
@@ -159,7 +159,7 @@ canvas#field {
           <thead><tr><th></th><th>速度</th><th>射程</th><th>スパン</th><th>a</th><th>e</th><th>b̄</th><th>d</th><th>c</th><th>費</th></tr></thead>
           <tbody id="stats-body"></tbody>
         </table>
-        <p class="note">スパンごとに射程内の敵<strong>全員</strong>を攻撃（砲撃艦のみ最も近い 1 隻を狙撃） ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
+        <p class="note">スパンごとに射程内で<strong>最も近い敵 1 隻</strong>を攻撃 ・ 命中率 <code>(e − d)/100</code> ・ 命中時 <code>c ← c − a×b</code>（b ~ N(b̄, 0.25)） ・ <code>c &lt; 0</code> で撃沈。速度はマス/秒、射程は半径（マス）。</p>
       </div>
       <div class="box">
         <h2>設定</h2>
@@ -224,9 +224,8 @@ const TYPES = {
   fighter: { name: '攻撃機', speed: 1.2, range: 1.5, span: 1.0, a: 10, e: 110, bMean: 0.75, bSd: 0.25, d: 70, c: 10, r: 0.28 },
   // 突撃艦：e・d は中程度、体力大、b が小さい（＝装甲が厚い）。砲撃艦の射程を素早く詰められる速さ
   assault: { name: '突撃艦', speed: 1.0, range: 1.8, span: 1.6, a: 20, e: 100, bMean: 0.30, bSd: 0.25, d: 55, c: 45, r: 0.38 },
-  // 砲撃艦：長射程・高命中だが回避が低い。体力は低め、スパン長く移動は遅い。
-  //         射程内の全員ではなく最も近い 1 隻だけを狙撃する（splash: 着弾点から巻き込む半径。0 = 単体）
-  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, splash: 0, a: 40, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 17, r: 0.45 },
+  // 砲撃艦：長射程・高命中だが回避が低い。体力は低め、スパン長く移動は遅い
+  artillery: { name: '砲撃艦', speed: 0.15, range: 5.0, span: 3.0, a: 40, e: 125, bMean: 0.50, bSd: 0.25, d: 20, c: 17, r: 0.45 },
 };
 const SYM = { fighter: '●', assault: '◆', artillery: '■' };
 const SIDES = {
@@ -403,19 +402,15 @@ function step(dt) {
   }
   separate();
 
-  // 自動攻撃：スパンごとに射程内の敵すべてを攻撃
+  // 自動攻撃：スパンごとに射程内で最も近い敵 1 隻を攻撃
   // 同じフレーム内で撃沈された艦も、そのフレームの攻撃は行う（処理順による有利不利をなくす）
   for (const s of S.ships) {
     s.cd = Math.max(0, s.cd - dt);
     if (s.cd > 0) continue;
     const t = TYPES[s.type];
-    let targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(s, q) <= t.range);
-    if (!targets.length) continue;
-    // splash を持つ艦は、射程内の敵全員ではなく最も近い 1 隻に着弾し、その周囲 splash マス以内の敵も巻き込む
-    if (t.splash != null) {
-      const aim = targets.reduce((m, q) => dist(s, q) < dist(s, m) ? q : m);
-      targets = S.ships.filter(q => q.side !== s.side && !q.dead && dist(aim, q) <= t.splash);
-    }
+    const inRange = S.ships.filter(q => q.side !== s.side && !q.dead && dist(s, q) <= t.range);
+    if (!inRange.length) continue;
+    const targets = [inRange.reduce((m, q) => dist(s, q) < dist(s, m) ? q : m)];
     s.cd = t.span;
     for (const q of targets) {
       const qt = TYPES[q.type];
@@ -518,7 +513,7 @@ function claudePrompt(side) {
 FIELD: continuous ${F}x${F} area, x = 0..${F} left to right, y = 0..${F} top to bottom. Red camp is y < ${CAMP} (top), blue camp is y > ${F - CAMP} (bottom). ${side} ships can never enter the enemy camp.
 SHIPS move in a straight line to the point you order.
 ${shipLines}
-Every shot of fighters and assault ships hits ALL enemies inside the attack radius; artillery hits only the single NEAREST enemy in range. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
+Each shot hits only the single NEAREST enemy inside the attack radius. Hit chance = (e_attacker - d_target)/100; on hit target hp -= a * b (b ~ Normal(mean, 0.25)); hp < 0 destroys it.
 Hit chances:
 ${hitLines}
 
