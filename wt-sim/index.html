@@ -39,7 +39,7 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-
 @media (min-width:1000px){.main{grid-template-columns:minmax(0,1fr) 360px;align-items:start}}
 .board{position:relative;width:100%;max-width:820px;aspect-ratio:1;margin:0 auto;border:1px solid var(--line);background:#081014;touch-action:manipulation}
 .board canvas#map{position:absolute;inset:0;width:100%;height:100%;display:block}
-.radar{position:absolute;top:8px;right:8px;width:24%;aspect-ratio:1;border:1px solid rgba(111,212,154,.6);background:rgba(4,14,10,.82);pointer-events:none}
+.radar{position:absolute;top:8px;right:8px;width:20%;aspect-ratio:1;border:1px solid rgba(111,212,154,.6);background:rgba(4,14,10,.82);pointer-events:none}
 .radar canvas{width:100%;height:100%;display:block}
 .radar::after{content:"RADAR";position:absolute;left:4px;bottom:2px;font-family:var(--mono);font-size:9px;color:rgba(111,212,154,.8);letter-spacing:.15em}
 .side{display:grid;gap:12px}
@@ -67,11 +67,11 @@ header.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-
 .apline{font-family:var(--mono);font-size:13px;color:var(--ink-dim);margin:4px 0 10px}
 .apline b{color:var(--ink);font-weight:400}
 .plan-row{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}
-.pad{display:grid;grid-template-columns:repeat(3,40px);gap:4px}
-.pad button{height:40px}
-button.btn,.pad button{appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:3px;font:inherit;cursor:pointer;padding:6px 10px}
-.pad button{padding:0;font-size:16px}
-.pad button.on{border-color:var(--accent);color:var(--accent)}
+.face{display:grid;gap:6px;min-width:0;flex:1 1 200px}
+.face .deg{font-family:var(--mono);color:var(--accent);font-size:16px}
+.face input[type=range]{width:100%;accent-color:var(--accent)}
+button.btn{appearance:none;border:1px solid var(--line);background:var(--panel-2);color:var(--ink);border-radius:3px;font:inherit;cursor:pointer;padding:6px 10px}
+button.btn.on{border-color:var(--accent);color:var(--accent)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button:disabled{opacity:.4;cursor:default}
 .actions{display:flex;flex-wrap:wrap;gap:6px}
@@ -124,9 +124,13 @@ details.rules ul{padding-left:18px;margin:6px 0}
         <div class="trig" id="uTrig"></div>
         <div class="apline" id="uAp"></div>
         <div class="plan-row">
-          <div>
-            <div class="hint" style="margin:0 0 4px">最終的な向き</div>
-            <div class="pad" id="pad"></div>
+          <div class="face">
+            <div class="hint" style="margin:0">最終的な向き <span class="deg" id="faceDeg">--</span></div>
+            <input type="range" id="faceSlider" min="0" max="359" step="1" value="0" aria-label="最終的な向き（北から時計回りの角度）">
+            <div class="actions">
+              <button class="btn" id="faceTap">マップで向きを指定</button>
+              <button class="btn" id="faceAuto">移動方向のまま</button>
+            </div>
           </div>
           <div class="actions" style="flex-direction:column">
             <button class="btn" id="clearPath">経路を消す</button>
@@ -134,7 +138,7 @@ details.rules ul{padding-left:18px;margin:6px 0}
             <button class="btn primary" id="ready">作戦終了</button>
           </div>
         </div>
-        <p class="hint">ユニットを選んでマップをタップすると経路を追加します。移動で余った行動力は、扇形の範囲に入った敵への自動攻撃と防御に使われます。</p>
+        <p class="hint">ユニットを選んでマップをタップすると経路を追加します。「マップで向きを指定」を押してからマップをタップ（ドラッグ）すると、その方向へ向きます。移動で余った行動力は、扇形の範囲に入った敵への自動攻撃と防御に使われます。</p>
       </div>
 
       <div class="card">
@@ -151,10 +155,11 @@ details.rules ul{padding-left:18px;margin:6px 0}
           <summary>ルール</summary>
           <ul>
             <li>作戦タイム（150秒）で全ユニットの経路と向きを決め、その後15秒で全員が同時に動きます。これを6ターン行います。</li>
-            <li>1マス移動で行動力1、建物を1段上るごとに行動力+1。一度に上れるのは2段まで（グラスホッパー装備なら4段）。</li>
+            <li>マップは六角マスです。1マス移動で行動力1、建物を1段上るごとに行動力+1。一度に上れるのは2段まで（グラスホッパー装備なら4段）。</li>
             <li>メイン・サブのトリガーにはそれぞれ扇形の範囲があり、範囲に敵が入ると自動で攻撃します（攻撃にも行動力を使います）。</li>
             <li>シールドは向いている側からの攻撃だけ防ぎます。バッグワーム装備の敵はレーダーに映りません。</li>
             <li>6ターン終了時に生存数で2体以上の差をつけた側の勝ちです。</li>
+            <li>建物の色は高さを表します（黄緑1、緑2、黄3、橙4、赤5、灰色は立入不可）。</li>
             <li>雨取以外のパラメータとダメージ計算は仮の数値です。</li>
           </ul>
         </details>
@@ -166,10 +171,12 @@ details.rules ul{padding-left:18px;margin:6px 0}
 <script>
 (() => {
 'use strict';
-const N = 24, TICKS = 15, TURNS = 6, PLAN_SEC = 150, VIS = 7, WIN_DIFF = 2;
-const DIRS = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
-const PAD = [5,6,7,4,-1,0,3,2,1];
-const ARROW = ['→','↘','↓','↙','←','↖','↑','↗'];
+const COLS = 24, ROWS = 28, NC = COLS*ROWS, TICKS = 15, TURNS = 6, PLAN_SEC = 150, VIS = 7, WIN_DIFF = 2, WALL = 9;
+const S3 = Math.sqrt(3), HR = 1/S3;               // 隣接マスの中心間距離を1とした六角形の半径
+const WU = COLS + .5, HU = (ROWS-1)*S3/2 + 2*HR;  // マップ全体の大きさ（マス単位）
+// odd-r 配置の隣接マス（東, 南東, 南西, 西, 北西, 北東）
+const NB_EVEN = [[1,0],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1]];
+const NB_ODD  = [[1,0],[1,1],[0,1],[-1,0],[0,-1],[1,-1]];
 
 const TRIG = {
   '弧月':        {kind:'blade', atk:1, range:1.5, fan:120, pow:30, sc:6,   acc:85, ap:2, cd:1},
@@ -179,181 +186,184 @@ const TRIG = {
   'ハウンド':    {kind:'shoot', atk:1, range:6,   fan:150, pow:9,  sc:1.6, acc:88, ap:2, cd:2, noLOS:1},
   'メテオラ':    {kind:'shoot', atk:1, range:5,   fan:90,  pow:12, sc:1.8, acc:70, ap:3, cd:3, splash:1},
   '散弾銃':      {kind:'gun',   atk:1, range:4,   fan:90,  pow:16, sc:1.5, acc:80, ap:2, cd:1},
-  'イーグレット':{kind:'snipe', atk:1, range:14,  fan:40,  pow:40, sc:2,   acc:60, ap:3, cd:3},
-  'アイビス':    {kind:'snipe', atk:1, range:12,  fan:30,  pow:50, sc:3,   acc:50, ap:4, cd:4, pierce:0.3},
+  'イーグレット':{kind:'snipe', atk:1, range:14,  fan:30,  pow:40, sc:2,   acc:60, ap:3, cd:3},
+  'アイビス':    {kind:'snipe', atk:1, range:12,  fan:24,  pow:50, sc:3,   acc:50, ap:4, cd:4, pierce:0.3},
   'シールド':    {kind:'guard', shield:8, shieldFan:150, shieldSc:1.5},
   'バッグワーム':{kind:'cloak', evadeFan:120},
   'グラスホッパー':{kind:'move', evadeFan:120},
 };
 
 const ROSTER_P = [
-  ['三雲 修',   '修', 10, 4, 2,3,3,5,4, 'レイガスト','アステロイド',[]],
-  ['雨取 千佳', '千', 12,25, 2,4,3,3,2, 'アイビス','シールド',['トリオン・極大']],
-  ['隠岐 孝二', '隠', 11, 6, 3,2,4,3,5, 'イーグレット','グラスホッパー',['精密狙撃']],
-  ['香取 葉子', '香', 12, 7, 5,2,5,2,4, 'スコーピオン','アステロイド',['健脚']],
-  ['水上 敏志', '水', 10, 8, 3,3,3,5,5, 'アステロイド','メテオラ',['トリオン・大']],
-  ['荒船 哲次', '荒', 10, 6, 4,3,3,3,5, 'イーグレット','弧月',['近接防御']],
-  ['樫尾 由多嘉','樫', 10, 6, 3,4,3,3,3, '弧月','シールド',['受け太刀']],
-  ['照屋 文香', '照', 11, 6, 4,3,4,4,4, '弧月','ハウンド',[]],
-  ['木虎 藍',   '木', 12, 5, 4,2,5,3,5, 'スコーピオン','アステロイド',['早撃ち'], true],
+  ['三雲 修',   '三雲', 10, 4, 2,3,3,5,4, 'レイガスト','アステロイド',[]],
+  ['雨取 千佳', '雨取', 12,25, 2,4,3,3,2, 'アイビス','シールド',['トリオン・極大']],
+  ['隠岐 孝二', '隠岐', 11, 6, 3,2,4,3,5, 'イーグレット','グラスホッパー',['精密狙撃']],
+  ['香取 葉子', '香取', 12, 7, 5,2,5,2,4, 'スコーピオン','アステロイド',['健脚']],
+  ['水上 敏志', '水上', 10, 8, 3,3,3,5,5, 'アステロイド','メテオラ',['トリオン・大']],
+  ['荒船 哲次', '荒船', 10, 6, 4,3,3,3,5, 'イーグレット','弧月',['近接防御']],
+  ['樫尾 由多嘉','樫尾', 10, 6, 3,4,3,3,3, '弧月','シールド',['受け太刀']],
+  ['照屋 文香', '照屋', 11, 6, 4,3,4,4,4, '弧月','ハウンド',[]],
+  ['木虎 藍',   '木虎', 12, 5, 4,2,5,3,5, 'スコーピオン','アステロイド',['早撃ち'], true],
 ];
 const ROSTER_E = [
-  ['風間 蒼也', '風', 12, 6, 5,3,5,4,5, 'スコーピオン','バッグワーム',['早撃ち']],
-  ['歌川 遼',   '歌', 11, 6, 4,3,4,4,4, 'スコーピオン','シールド',[]],
-  ['菊地原 士郎','菊', 11, 5, 4,2,4,3,4, 'スコーピオン','シールド',['強化聴覚']],
-  ['諏訪 洸太郎','諏',  9, 7, 4,4,2,3,3, '散弾銃','シールド',[]],
-  ['堤 大地',   '堤',  9, 7, 3,4,2,4,3, '散弾銃','シールド',[]],
-  ['奈良坂 透', '奈', 10, 7, 3,2,3,3,6, 'イーグレット','バッグワーム',['精密狙撃']],
-  ['当真 勇',   '当', 10, 7, 3,2,3,2,6, 'イーグレット','バッグワーム',['感覚狙撃']],
-  ['村上 鋼',   '村', 10, 7, 5,5,3,3,4, '弧月','レイガスト',['受け太刀']],
-  ['二宮 匡貴', '二', 10,14, 3,3,3,4,5, 'アステロイド','ハウンド',['トリオン・大'], true],
+  ['風間 蒼也', '風間', 12, 6, 5,3,5,4,5, 'スコーピオン','バッグワーム',['早撃ち']],
+  ['歌川 遼',   '歌川', 11, 6, 4,3,4,4,4, 'スコーピオン','シールド',[]],
+  ['菊地原 士郎','菊地', 11, 5, 4,2,4,3,4, 'スコーピオン','シールド',['強化聴覚']],
+  ['諏訪 洸太郎','諏訪',  9, 7, 4,4,2,3,3, '散弾銃','シールド',[]],
+  ['堤 大地',   '堤',    9, 7, 3,4,2,4,3, '散弾銃','シールド',[]],
+  ['奈良坂 透', '奈良', 10, 7, 3,2,3,3,6, 'イーグレット','バッグワーム',['精密狙撃']],
+  ['当真 勇',   '当真', 10, 7, 3,2,3,2,6, 'イーグレット','バッグワーム',['感覚狙撃']],
+  ['村上 鋼',   '村上', 10, 7, 5,5,3,3,4, '弧月','レイガスト',['受け太刀']],
+  ['二宮 匡貴', '二宮', 10,14, 3,3,3,4,5, 'アステロイド','ハウンド',['トリオン・大'], true],
 ];
+
+// ---------- hex geometry ----------
+const idx=(x,y)=>y*COLS+x, inb=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
+function P(x,y){return [x+.5*(y&1), y*S3/2];}
+function nbrs(x,y){return ((y&1)?NB_ODD:NB_EVEN).map(([dx,dy])=>[x+dx,y+dy]).filter(([a,b])=>inb(a,b));}
+function toHex(ux,uy){
+  const q=(S3/3*ux-uy/3)/HR, r=(2/3*uy)/HR, s=-q-r;
+  let rq=Math.round(q), rr=Math.round(r); const rs=Math.round(s);
+  const dq=Math.abs(rq-q), dr=Math.abs(rr-r), ds=Math.abs(rs-s);
+  if(dq>dr&&dq>ds) rq=-rr-rs; else if(dr>ds) rr=-rq-rs;
+  return [rq+(rr-(rr&1))/2, rr];
+}
+function dist(a,b){const [ax,ay]=P(a.x,a.y),[bx,by]=P(b.x,b.y);return Math.hypot(bx-ax,by-ay);}
+function angleTo(x1,y1,x2,y2){const [ax,ay]=P(x1,y1),[bx,by]=P(x2,y2);return Math.atan2(by-ay,bx-ax);}
+function angDiff(a,b){let d=Math.abs(a-b)%(2*Math.PI);return d>Math.PI?2*Math.PI-d:d;}
+function inFan(ox,oy,face,fan,range,tx,ty){
+  const [ax,ay]=P(ox,oy),[bx,by]=P(tx,ty), d=Math.hypot(bx-ax,by-ay);
+  if(d===0||d>range+1e-6) return false;
+  return angDiff(Math.atan2(by-ay,bx-ax),face)<=fan/2*Math.PI/180+1e-6;
+}
 
 // ---------- map ----------
 function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-let H = [];
+let H=[];
 function genMap(seed){
-  const r = rng(seed); H = new Array(N*N).fill(0);
-  const set=(x,y,h)=>{H[y*N+x]=h;};
-  for (const [qx,qy] of [[1,1],[13,1],[1,13],[13,13]]) {
-    const a = 4+Math.floor(r()*2), b = 4+Math.floor(r()*2);
-    for (const [x0,x1] of [[0,a-1],[a+1,9]]) for (const [y0,y1] of [[0,b-1],[b+1,9]]) {
-      const t = r(), X0=qx+x0, X1=qx+x1, Y0=qy+y0, Y1=qy+y1;
-      if (t < 0.35) {           // 民家
-        for (let y=Y0;y<=Y1;y++) for (let x=X0;x<=X1;x++){
-          const lx=x-X0, ly=y-Y0;
-          if (lx%3<2 && ly%3<2) set(x,y, 1 + (((Math.floor(lx/3)*7+Math.floor(ly/3)*3+X0)%3===0)?1:0));
-        }
-      } else if (t < 0.65) {    // ビル
-        const h = 3 + (r()<0.5?1:0);
-        for (let y=Y0;y<=Y1;y++) for (let x=X0;x<=X1;x++) set(x,y,h);
-        set(r()<0.5?X0:X1, r()<0.5?Y0:Y1, 2);
-      } else if (t < 0.87) {    // 工場
-        for (let y=Y0;y<=Y1;y++) for (let x=X0;x<=X1;x++) set(x,y,2);
+  const r=rng(seed); H=new Array(NC).fill(0);
+  const set=(x,y,h)=>{if(inb(x,y))H[idx(x,y)]=h;};
+  for(const [qx,qy] of [[1,1],[13,1],[1,15],[13,15]]){
+    const a=4+Math.floor(r()*2), b=5+Math.floor(r()*2);
+    for(const [x0,x1] of [[0,a-1],[a+1,9]]) for(const [y0,y1] of [[0,b-1],[b+1,11]]){
+      const t=r(), X0=qx+x0, X1=qx+x1, Y0=qy+y0, Y1=qy+y1;
+      if(t<0.28){            // 民家
+        for(let y=Y0;y<=Y1;y++) for(let x=X0;x<=X1;x++){ const lx=x-X0, ly=y-Y0;
+          if(lx%3<2&&ly%3<2) set(x,y,1+(((Math.floor(lx/3)*7+Math.floor(ly/3)*3+X0)%3===0)?1:0)); }
+      } else if(t<0.58){     // ビル（角に上り口）
+        const h=3+Math.floor(r()*3);
+        for(let y=Y0;y<=Y1;y++) for(let x=X0;x<=X1;x++) set(x,y,h);
+        const cx=r()<.5?X0:X1, cy=r()<.5?Y0:Y1, nx=cx===X0?X0+1:X1-1;
+        set(cx,cy,h-2); if(h-4>0) set(nx,cy,h-4);
+      } else if(t<0.8){      // 工場
+        for(let y=Y0;y<=Y1;y++) for(let x=X0;x<=X1;x++) set(x,y,2);
+      } else if(t<0.9){      // 立入不可
+        for(let y=Y0+1;y<=Y1-1;y++) for(let x=X0;x<=X1;x++) set(x,y,WALL);
       }
     }
   }
 }
-const idx=(x,y)=>y*N+x, inb=(x,y)=>x>=0&&y>=0&&x<N&&y<N;
 
 // ---------- state ----------
-let units=[], turn=1, phase='plan', timeLeft=PLAN_SEC, started=false, tick=0, sel=null, effects=[], logs=[], quiet=0, gameOver=false;
+let units=[], turn=1, phase='plan', timeLeft=PLAN_SEC, started=false, tick=0, sel=null, effects=[], logs=[], quiet=0, aiming=false;
 
-function mkUnit(row, team, i){
-  const [name, short, ap, tr, atk, def, eva, sup, tec, main, sub, skills, help] = row;
-  const x = 3 + i*2, y = team==='P' ? N-1 : 0;
-  const u = {id:team+i, team, name, short, apBase:ap, tr, atk, def, eva, sup, tec, main, sub, skills, help:!!help,
-    x, y, rx:x, ry:y, face: team==='P'?6:2, maxhp: 60+tr*2, alive:true, path:[], planFace:null, cd:[0,0], planned:false};
-  u.apMax = ap + (has(u,'健脚')?1:0);
-  u.hp = u.maxhp; u.ap = u.apMax;
+function mkUnit(row,team,i){
+  const [name,short,ap,tr,atk,def,eva,sup,tec,main,sub,skills,help]=row;
+  const x=3+i*2, y=team==='P'?ROWS-1:0, face=team==='P'?-Math.PI/2:Math.PI/2;
+  const u={id:team+i,team,name,short,tr,atk,def,eva,sup,tec,main,sub,skills,help:!!help,
+    x,y,rx:x,ry:y,face,rface:face,maxhp:60+tr*2,alive:true,path:[],planFace:null,cd:[0,0],planned:false};
+  u.apMax=ap+(has(u,'健脚')?1:0); u.hp=u.maxhp; u.ap=u.apMax;
   return u;
 }
 function has(u,s){return u.skills.includes(s);}
 function hasTrig(u,t){return u.main===t||u.sub===t;}
 function climbMax(u){return hasTrig(u,'グラスホッパー')?4:2;}
-function stepCost(u,ax,ay,bx,by){const dh=H[idx(bx,by)]-H[idx(ax,ay)]; if(dh>climbMax(u)) return Infinity; return 1+Math.max(0,dh);}
+function stepCost(u,ax,ay,bx,by){const hb=H[idx(bx,by)]; if(hb>=WALL) return Infinity; const dh=hb-H[idx(ax,ay)]; if(dh>climbMax(u)) return Infinity; return 1+Math.max(0,dh);}
 function unitAt(x,y){return units.find(u=>u.alive&&u.x===x&&u.y===y);}
 function rangeOf(u,t){
   let r=t.range;
-  if(t.kind==='snipe'){ r += Math.floor(H[idx(u.x,u.y)]/2); if(has(u,'精密狙撃')) r+=2; }
+  if(t.kind==='snipe'){ r+=Math.floor(H[idx(u.x,u.y)]/2); if(has(u,'精密狙撃')) r+=2; }
   if(t.kind==='shoot'||t.kind==='snipe'){ if(has(u,'トリオン・大')) r+=1; if(has(u,'トリオン・極大')) r+=2; }
   return r;
 }
 function splashOf(u,t){return (t.splash||0)+(has(u,'トリオン・大')?1:0)+(has(u,'トリオン・極大')?2:0);}
-function dirTo(dx,dy){return ((Math.round(Math.atan2(dy,dx)/(Math.PI/4))%8)+8)%8;}
-function angDiff(a,b){let d=Math.abs(a-b)%(2*Math.PI); return d>Math.PI?2*Math.PI-d:d;}
-function inFan(ox,oy,face,fan,range,tx,ty){
-  const dx=tx-ox, dy=ty-oy, d=Math.hypot(dx,dy);
-  if(d===0||d>range+1e-6) return false;
-  const fa=Math.atan2(DIRS[face][1],DIRS[face][0]);
-  return angDiff(Math.atan2(dy,dx),fa) <= fan/2*Math.PI/180+1e-6;
-}
 function los(ax,ay,bx,by){
-  const ha=H[idx(ax,ay)]+.5, hb=H[idx(bx,by)]+.5, top=Math.max(ha,hb);
-  const d=Math.hypot(bx-ax,by-ay), steps=Math.ceil(d*4);
+  const top=Math.max(H[idx(ax,ay)],H[idx(bx,by)])+.5;
+  const [px,py]=P(ax,ay),[qx,qy]=P(bx,by), steps=Math.ceil(Math.hypot(qx-px,qy-py)*4);
   for(let i=1;i<steps;i++){
-    const t=i/steps, cx=Math.floor(ax+.5+(bx-ax)*t), cy=Math.floor(ay+.5+(by-ay)*t);
-    if((cx===ax&&cy===ay)||(cx===bx&&cy===by)) continue;
+    const t=i/steps, [cx,cy]=toHex(px+(qx-px)*t, py+(qy-py)*t);
+    if((cx===ax&&cy===ay)||(cx===bx&&cy===by)||!inb(cx,cy)) continue;
     if(H[idx(cx,cy)]>top) return false;
   }
   return true;
 }
 function teamVisibleEnemies(team){
-  const seen=new Set();
-  const mine=units.filter(u=>u.alive&&u.team===team);
+  const seen=new Set(), mine=units.filter(u=>u.alive&&u.team===team);
   for(const e of units){ if(!e.alive||e.team===team) continue;
-    for(const u of mine){ const d=Math.hypot(e.x-u.x,e.y-u.y);
+    for(const u of mine){ const d=dist(u,e);
       if((d<=VIS&&los(u.x,u.y,e.x,e.y))||(has(u,'強化聴覚')&&d<=10)){seen.add(e.id);break;} } }
   return seen;
 }
 function visibleCells(team){
-  const v=new Uint8Array(N*N);
-  for(const u of units){ if(!u.alive||u.team!==team) continue;
-    for(let y=Math.max(0,u.y-VIS);y<=Math.min(N-1,u.y+VIS);y++) for(let x=Math.max(0,u.x-VIS);x<=Math.min(N-1,u.x+VIS);x++){
-      if(v[idx(x,y)]) continue;
-      if(Math.hypot(x-u.x,y-u.y)<=VIS && los(u.x,u.y,x,y)) v[idx(x,y)]=1;
-    } }
+  const v=new Uint8Array(NC), mine=units.filter(u=>u.alive&&u.team===team);
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++)
+    for(const u of mine){ if(dist(u,{x,y})<=VIS&&los(u.x,u.y,x,y)){v[idx(x,y)]=1;break;} }
   return v;
 }
 
 // ---------- pathfinding ----------
 function dijkstra(u,sx,sy){
-  const dist=new Array(N*N).fill(Infinity), prev=new Int32Array(N*N).fill(-1), done=new Uint8Array(N*N);
-  dist[idx(sx,sy)]=0;
+  const d=new Array(NC).fill(Infinity), prev=new Int32Array(NC).fill(-1), done=new Uint8Array(NC);
+  d[idx(sx,sy)]=0;
   for(;;){
     let best=-1,bd=Infinity;
-    for(let i=0;i<N*N;i++) if(!done[i]&&dist[i]<bd){bd=dist[i];best=i;}
+    for(let i=0;i<NC;i++) if(!done[i]&&d[i]<bd){bd=d[i];best=i;}
     if(best<0) break; done[best]=1;
-    const bx=best%N, by=(best/N)|0;
-    for(const [dx,dy] of DIRS){ const nx=bx+dx, ny=by+dy; if(!inb(nx,ny)) continue;
-      const c=stepCost(u,bx,by,nx,ny); if(c===Infinity) continue;
-      const ni=idx(nx,ny); if(bd+c<dist[ni]){dist[ni]=bd+c;prev[ni]=best;} }
+    const bx=best%COLS, by=(best/COLS)|0;
+    for(const [nx,ny] of nbrs(bx,by)){ const c=stepCost(u,bx,by,nx,ny); if(c===Infinity) continue;
+      const ni=idx(nx,ny); if(bd+c<d[ni]){d[ni]=bd+c;prev[ni]=best;} }
   }
-  return {dist,prev};
+  return {dist:d,prev};
 }
 function trace(prev,sx,sy,tx,ty){
-  const out=[]; let c=idx(tx,ty), s=idx(sx,sy);
-  while(c!==s&&c>=0){out.push([c%N,(c/N)|0]); c=prev[c];}
+  const out=[]; let c=idx(tx,ty); const s=idx(sx,sy);
+  while(c!==s&&c>=0){out.push([c%COLS,(c/COLS)|0]); c=prev[c];}
   return c===s?out.reverse():null;
 }
 function pathEnd(u){return u.path.length?u.path[u.path.length-1]:[u.x,u.y];}
 function pathCost(u){let c=0,px=u.x,py=u.y; for(const [x,y] of u.path){c+=stepCost(u,px,py,x,y);px=x;py=y;} return c;}
 function endFace(u){
   if(u.planFace!=null) return u.planFace;
-  if(u.path.length){const a=u.path.length>1?u.path[u.path.length-2]:[u.x,u.y], b=u.path[u.path.length-1]; return dirTo(b[0]-a[0],b[1]-a[1]);}
+  if(u.path.length){const a=u.path.length>1?u.path[u.path.length-2]:[u.x,u.y], b=u.path[u.path.length-1]; return angleTo(a[0],a[1],b[0],b[1]);}
   return u.face;
 }
+const toDeg=a=>Math.round(((a*180/Math.PI+90)%360+360)%360);
+const fromDeg=d=>(d-90)*Math.PI/180;
 
 // ---------- AI ----------
-function planTeam(team, onlyUnplanned){
-  const foes=units.filter(e=>e.alive&&e.team!==team);
-  const seen=teamVisibleEnemies(team);
+function planTeam(team,onlyUnplanned){
+  const foes=units.filter(e=>e.alive&&e.team!==team), seen=teamVisibleEnemies(team);
   const known=foes.filter(e=>seen.has(e.id)||!hasTrig(e,'バッグワーム'));
-  const reserved=new Set(units.filter(u=>u.alive&&u.team===team&&(onlyUnplanned&&u.planned)).map(u=>idx(...pathEnd(u))));
+  const reserved=new Set(units.filter(u=>u.alive&&u.team===team&&onlyUnplanned&&u.planned).map(u=>idx(...pathEnd(u))));
   for(const u of units){
     if(!u.alive||u.team!==team||(onlyUnplanned&&u.planned)) continue;
-    let tgt=null, bd=Infinity;
-    for(const e of known){const d=Math.hypot(e.x-u.x,e.y-u.y); if(d<bd){bd=d;tgt=e;}}
-    const tx=tgt?tgt.x:11.5, ty=tgt?tgt.y:11.5;
-    const t=TRIG[u.main], rg=rangeOf(u,t);
-    const budget=u.apMax-(t.kind==='snipe'?t.ap:4);
-    const {dist,prev}=dijkstra(u,u.x,u.y);
+    let tgt=null,bd=Infinity;
+    for(const e of known){const d=dist(u,e); if(d<bd){bd=d;tgt=e;}}
+    const goal=tgt||{x:11,y:13};
+    const t=TRIG[u.main], rg=rangeOf(u,t), budget=u.apMax-(t.kind==='snipe'?t.ap:4);
+    const {dist:dd,prev}=dijkstra(u,u.x,u.y);
     let best=idx(u.x,u.y), bs=-Infinity;
-    for(let i=0;i<N*N;i++){
-      if(dist[i]>budget||reserved.has(i)) continue;
-      const cx=i%N, cy=(i/N)|0, o=unitAt(cx,cy); if(o&&o!==u) continue;
-      const d=Math.hypot(tx-cx,ty-cy);
-      let s;
-      if(t.kind==='snipe') s=-Math.abs(d-Math.min(10,rg-2))+H[i]*1.3;
-      else if(t.kind==='blade') s=-d;
-      else s=-Math.abs(d-(rg-1))+H[i]*0.3;
-      s-=dist[i]*0.05;
+    for(let i=0;i<NC;i++){
+      if(dd[i]>budget||reserved.has(i)) continue;
+      const cx=i%COLS, cy=(i/COLS)|0, o=unitAt(cx,cy); if(o&&o!==u) continue;
+      const d=dist({x:cx,y:cy},goal);
+      let s=t.kind==='snipe'?-Math.abs(d-Math.min(10,rg-2))+H[i]*1.3:t.kind==='blade'?-d:-Math.abs(d-(rg-1))+H[i]*.3;
+      s-=dd[i]*.05;
       if(s>bs){bs=s;best=i;}
     }
     reserved.add(best);
-    u.path=trace(prev,u.x,u.y,best%N,(best/N)|0)||[];
+    u.path=trace(prev,u.x,u.y,best%COLS,(best/COLS)|0)||[];
     const [ex,ey]=pathEnd(u);
-    u.planFace=(ex===tx&&ey===ty)?null:dirTo(tx-ex,ty-ey);
+    u.planFace=(ex===goal.x&&ey===goal.y)?null:angleTo(ex,ey,goal.x,goal.y);
     u.planned=true;
   }
 }
@@ -361,66 +371,58 @@ function planTeam(team, onlyUnplanned){
 // ---------- combat ----------
 function log(text,cls){logs.unshift({text,cls}); if(logs.length>80) logs.pop(); renderLog();}
 function fx(e){e.t0=performance.now(); effects.push(e);}
-function declareAttacks(u, seen){
+function declareAttacks(u,seen){
   const out=[];
   [u.main,u.sub].forEach((tn,slot)=>{
     const t=TRIG[tn]; if(!t.atk||u.cd[slot]>0||u.ap<t.ap) return;
-    const rg=rangeOf(u,t);
-    let tgt=null, bd=Infinity;
+    const rg=rangeOf(u,t); let tgt=null,bd=Infinity;
     for(const e of units){
-      if(!e.alive||e.team===u.team) continue;
-      if(!inFan(u.x,u.y,u.face,t.fan,rg,e.x,e.y)) continue;
-      if(t.noLOS ? !seen.has(e.id) : !los(u.x,u.y,e.x,e.y)) continue;
-      const d=Math.hypot(e.x-u.x,e.y-u.y)+e.hp/1000;
-      if(d<bd){bd=d;tgt=e;}
+      if(!e.alive||e.team===u.team||!inFan(u.x,u.y,u.face,t.fan,rg,e.x,e.y)) continue;
+      if(t.noLOS?!seen.has(e.id):!los(u.x,u.y,e.x,e.y)) continue;
+      const d=dist(u,e)+e.hp/1000; if(d<bd){bd=d;tgt=e;}
     }
     if(!tgt) return;
-    u.ap-=t.ap; u.cd[slot]=t.cd;
-    out.push({u,t,tn,tgt});
+    u.ap-=t.ap; u.cd[slot]=t.cd; out.push({u,t,tn,tgt});
   });
   return out;
 }
 function shieldOf(e,ax,ay){
   for(const tn of [e.main,e.sub]){ const t=TRIG[tn];
-    if(t.shield && e.ap>=1 && inFan(e.x,e.y,e.face,t.shieldFan,99,ax,ay)) return {val:t.shield+e.tr*t.shieldSc, tn};
-  }
+    if(t.shield&&e.ap>=1&&inFan(e.x,e.y,e.face,t.shieldFan,99,ax,ay)) return {val:t.shield+e.tr*t.shieldSc}; }
   return null;
 }
 function evadeOf(e,ax,ay){
   for(const tn of [e.main,e.sub]){ const t=TRIG[tn];
-    if(t.evadeFan && e.ap>=1 && inFan(e.x,e.y,e.face,t.evadeFan,99,ax,ay)) return true;
-  }
+    if(t.evadeFan&&e.ap>=1&&inFan(e.x,e.y,e.face,t.evadeFan,99,ax,ay)) return true; }
   return false;
 }
-function resolve(a, dmgMap){
-  const {u,t,tn,tgt:e}=a;
-  const col=u.team==='P'?'#4fb3ff':'#ff6b5a';
+function resolve(a,dmgMap){
+  const {u,t,tn,tgt:e}=a, col=u.team==='P'?'#2f7fe0':'#e0443a';
   let hit=t.acc+u.tec*3-e.eva*5;
   if(H[idx(u.x,u.y)]>=H[idx(e.x,e.y)]+2) hit+=10;
   if(t.kind==='snipe'&&has(u,'精密狙撃')) hit+=15;
   if(evadeOf(e,u.x,u.y)){hit-=15; e.ap-=1;}
   hit=Math.max(10,Math.min(95,hit));
   if(t.kind==='snipe'&&has(u,'感覚狙撃')) hit=95;
-  fx({type:t.kind==='blade'?'slash':'shot', snipe:t.kind==='snipe', x1:u.x,y1:u.y,x2:e.x,y2:e.y,color:col,dur:t.kind==='snipe'?700:450});
-  if(Math.random()*100>=hit){ fx({type:'text',x:e.x,y:e.y,text:'MISS',color:'#8fb0b8',dur:900}); log(`${u.short} ${tn} → ${e.short} 回避`,u.team==='P'?'p':'e'); return; }
-  let dmg=t.pow+(t.kind==='blade'?u.atk*t.sc:u.tr*t.sc);
-  dmg*=1-e.def*0.04;
+  fx({type:t.kind==='blade'?'slash':'shot',snipe:t.kind==='snipe',x1:u.x,y1:u.y,x2:e.x,y2:e.y,color:col,dur:t.kind==='snipe'?700:450});
+  if(Math.random()*100>=hit){ fx({type:'text',x:e.x,y:e.y,text:'MISS',color:'#5b6b7a',dur:900}); log(`${u.short} ${tn} → ${e.short} 回避`,u.team==='P'?'p':'e'); return; }
+  let dmg=(t.pow+(t.kind==='blade'?u.atk*t.sc:u.tr*t.sc))*(1-e.def*.04);
   const sh=shieldOf(e,u.x,u.y);
-  if(sh){ const block=sh.val*(t.pierce||1); e.ap-=1; dmg=Math.max(0,dmg-block); fx({type:'shield',x:e.x,y:e.y,face:e.face,dur:500}); }
+  if(sh){ e.ap-=1; dmg=Math.max(0,dmg-sh.val*(t.pierce||1)); fx({type:'shield',x:e.x,y:e.y,face:e.face,dur:500}); }
   if(t.kind==='blade'){
-    if(has(e,'受け太刀')&&hasTrig(e,'弧月')&&inFan(e.x,e.y,e.face,120,99,u.x,u.y)) dmg*=0.6;
-    if(has(e,'近接防御')) dmg*=0.6;
+    if(has(e,'受け太刀')&&hasTrig(e,'弧月')&&inFan(e.x,e.y,e.face,120,99,u.x,u.y)) dmg*=.6;
+    if(has(e,'近接防御')) dmg*=.6;
   }
   dmg=Math.round(dmg);
   dmgMap.set(e,(dmgMap.get(e)||0)+dmg);
-  fx({type:'text',x:e.x,y:e.y,text:dmg?`-${dmg}`:'GUARD',color:dmg?'#ffd27a':'#7fe3ff',dur:900});
+  fx({type:'text',x:e.x,y:e.y,text:dmg?`-${dmg}`:'GUARD',color:dmg?'#d9480f':'#1c7ed6',dur:900});
   log(`${u.short} ${tn} → ${e.short} ${dmg?dmg+'ダメージ':'シールドで防御'}${sh&&dmg?'（シールド越し）':''}`,u.team==='P'?'p':'e');
-  const sp=splashOf(u,t);
   if(t.splash){
+    const sp=splashOf(u,t);
     fx({type:'blast',x:e.x,y:e.y,r:sp,dur:600});
-    for(const o of units) if(o.alive&&o.team===e.team&&o!==e&&Math.hypot(o.x-e.x,o.y-e.y)<=sp+.01){
-      const sd=Math.round((t.pow+u.tr*t.sc)*0.6*(1-o.def*0.04)); dmgMap.set(o,(dmgMap.get(o)||0)+sd);
-      fx({type:'text',x:o.x,y:o.y,text:`-${sd}`,color:'#ffd27a',dur:900});
+    for(const o of units) if(o.alive&&o.team===e.team&&o!==e&&dist(o,e)<=sp+.01){
+      const sd=Math.round((t.pow+u.tr*t.sc)*.6*(1-o.def*.04)); dmgMap.set(o,(dmgMap.get(o)||0)+sd);
+      fx({type:'text',x:o.x,y:o.y,text:`-${sd}`,color:'#d9480f',dur:900});
     }
   }
 }
@@ -429,23 +431,20 @@ function applyDamage(dmgMap){
     fx({type:'bail',x:e.x,y:e.y,color:e.team==='P'?'#4fb3ff':'#ff6b5a',dur:1600});
     log(`${e.name} 緊急脱出`,'sys'); } }
 }
-
 function doTick(){
   let acted=false;
-  for(const u of units) if(u.alive){ u.cd[0]=Math.max(0,u.cd[0]-1); u.cd[1]=Math.max(0,u.cd[1]-1); }
-  const order=units.filter(u=>u.alive).sort(()=>Math.random()-.5);
-  for(const u of order){
+  for(const u of units) if(u.alive){u.cd[0]=Math.max(0,u.cd[0]-1);u.cd[1]=Math.max(0,u.cd[1]-1);}
+  for(const u of units.filter(u=>u.alive).sort(()=>Math.random()-.5)){
     if(!u.path.length) continue;
     const [nx,ny]=u.path[0], c=stepCost(u,u.x,u.y,nx,ny);
-    if(c>u.ap){ u.path=[]; if(u.planFace!=null) u.face=u.planFace; continue; }
+    if(c>u.ap){u.path=[]; if(u.planFace!=null) u.face=u.planFace; continue;}
     if(unitAt(nx,ny)) continue;
-    u.face=dirTo(nx-u.x,ny-u.y); u.x=nx; u.y=ny; u.ap-=c; u.path.shift(); acted=true;
+    u.face=angleTo(u.x,u.y,nx,ny); u.x=nx; u.y=ny; u.ap-=c; u.path.shift(); acted=true;
     if(!u.path.length&&u.planFace!=null) u.face=u.planFace;
   }
   const seenBy={P:teamVisibleEnemies('P'),E:teamVisibleEnemies('E')};
   const alive=units.filter(u=>u.alive);
-  const fast=alive.filter(u=>has(u,'早撃ち')), rest=alive.filter(u=>!has(u,'早撃ち'));
-  for(const group of [fast,rest]){
+  for(const group of [alive.filter(u=>has(u,'早撃ち')),alive.filter(u=>!has(u,'早撃ち'))]){
     const dmg=new Map(), atks=[];
     for(const u of group) if(u.alive) atks.push(...declareAttacks(u,seenBy[u.team]));
     for(const a of atks) resolve(a,dmg);
@@ -459,60 +458,54 @@ function doTick(){
 function execute(){
   if(phase!=='plan') return;
   planTeam('E',false);
-  phase='exec'; sel=sel&&sel.alive?sel:null; tick=0; quiet=0;
+  phase='exec'; aiming=false; tick=0; quiet=0;
   for(const u of units) if(u.alive&&!u.path.length&&u.planFace!=null) u.face=u.planFace;
   log(`ターン${turn} 実行開始`,'sys');
-  updateHud(); renderPanel();
-  scheduleTick();
+  updateHud(); renderPanel(); scheduleTick();
 }
 function scheduleTick(){
-  const fastMode=document.getElementById('optFast').checked;
   const idle=quiet>=2&&units.every(u=>!u.alive||!u.path.length);
-  setTimeout(stepExec, idle?120:(fastMode?500:1000));
+  setTimeout(stepExec, idle?120:($('optFast').checked?500:1000));
 }
 function stepExec(){
   if(phase!=='exec') return;
-  const acted=doTick(); tick++;
-  quiet=acted?0:quiet+1;
+  quiet=doTick()?0:quiet+1; tick++;
   updateHud(); renderChips(); renderPanel();
   const pa=units.filter(u=>u.alive&&u.team==='P').length, ea=units.filter(u=>u.alive&&u.team==='E').length;
-  if(pa===0||ea===0){ return setTimeout(endGame,1200); }
+  if(pa===0||ea===0) return setTimeout(endGame,1200);
   if(tick>=TICKS) return setTimeout(endTurn,600);
   scheduleTick();
 }
 function endTurn(){
   if(turn>=TURNS) return endGame();
   turn++; phase='plan'; timeLeft=PLAN_SEC;
-  for(const u of units){ u.ap=u.apMax; u.path=[]; u.planFace=null; u.planned=false; }
+  for(const u of units){u.ap=u.apMax; u.path=[]; u.planFace=null; u.planned=false;}
   if(!sel||!sel.alive) sel=units.find(u=>u.alive&&u.team==='P')||null;
   log(`ターン${turn} 作戦タイム`,'sys');
   updateHud(); renderChips(); renderPanel();
 }
 function endGame(){
-  phase='end'; gameOver=true;
-  const pa=units.filter(u=>u.alive&&u.team==='P').length, ea=units.filter(u=>u.alive&&u.team==='E').length;
-  const diff=pa-ea;
-  const title=diff>=WIN_DIFF?'勝利':diff<=-WIN_DIFF?'敗北':'引き分け';
-  const pts=diff>=WIN_DIFF?50:diff<=-WIN_DIFF?0:10;
-  document.getElementById('resTitle').textContent=title;
-  document.getElementById('resTitle').style.color=diff>=WIN_DIFF?'var(--ally)':diff<=-WIN_DIFF?'var(--enemy)':'var(--accent)';
-  document.getElementById('resDetail').textContent=`生存 ${pa} 対 ${ea} ／ 獲得 ${pts}点`;
-  document.getElementById('result').hidden=false;
+  phase='end';
+  const pa=units.filter(u=>u.alive&&u.team==='P').length, ea=units.filter(u=>u.alive&&u.team==='E').length, diff=pa-ea;
+  const title=diff>=WIN_DIFF?'勝利':diff<=-WIN_DIFF?'敗北':'引き分け', pts=diff>=WIN_DIFF?50:diff<=-WIN_DIFF?0:10;
+  $('resTitle').textContent=title;
+  $('resTitle').style.color=diff>=WIN_DIFF?'var(--ally)':diff<=-WIN_DIFF?'var(--enemy)':'var(--accent)';
+  $('resDetail').textContent=`生存 ${pa} 対 ${ea} ／ 獲得 ${pts}点`;
+  $('result').hidden=false;
   log(`演習終了：${title}（${pa} 対 ${ea}）`,'sys');
   updateHud();
 }
 function newGame(){
-  genMap(20260318 + Math.floor(Math.random()*1000));
-  units=[...ROSTER_P.map((r,i)=>mkUnit(r,'P',i)), ...ROSTER_E.map((r,i)=>mkUnit(r,'E',i))];
-  turn=1; phase='plan'; timeLeft=PLAN_SEC; effects=[]; logs=[]; gameOver=false;
-  sel=units[0];
-  document.getElementById('result').hidden=true;
+  genMap(20260318+Math.floor(Math.random()*1000));
+  units=[...ROSTER_P.map((r,i)=>mkUnit(r,'P',i)),...ROSTER_E.map((r,i)=>mkUnit(r,'E',i))];
+  turn=1; phase='plan'; timeLeft=PLAN_SEC; effects=[]; logs=[]; aiming=false; sel=units[0];
+  $('result').hidden=true;
   log('演習① 開始。作戦タイムです。','sys');
-  updateHud(); renderChips(); renderPanel();
+  buildMapLayer(); updateHud(); renderChips(); renderPanel();
 }
 
 // ---------- UI ----------
-const $=id=>document.getElementById(id);
+function $(id){return document.getElementById(id);}
 function updateHud(){
   $('turn').textContent=turn;
   const ph=$('phase');
@@ -528,189 +521,215 @@ function renderChips(){
     const b=document.createElement('button');
     b.className='chip'+(u===sel?' sel':'')+(u.alive?'':' dead');
     b.innerHTML=`<span class="row"><span>${u.name}</span><span class="ok">${u.alive?(u.path.length||u.planFace!=null?'✓':''):'脱出'}</span></span><span class="bar"><i style="width:${u.hp/u.maxhp*100}%"></i></span>`;
-    b.onclick=()=>{sel=u; renderChips(); renderPanel();};
+    b.onclick=()=>{sel=u; aiming=false; renderChips(); renderPanel();};
     box.appendChild(b);
   }
 }
 function renderPanel(){
-  const u=sel;
-  const planning=phase==='plan'&&u&&u.alive;
+  const u=sel, planning=phase==='plan'&&u&&u.alive;
   $('clearPath').disabled=!planning; $('autoPlan').disabled=phase!=='plan'; $('ready').disabled=phase!=='plan';
-  if(!u){ $('uName').textContent='-'; return; }
-  $('uName').textContent=u.name+(u.alive?'':'（緊急脱出）');
+  $('faceSlider').disabled=!planning; $('faceTap').disabled=!planning; $('faceAuto').disabled=!planning;
+  $('faceTap').classList.toggle('on',aiming);
+  if(!u){$('uName').textContent='-'; return;}
+  $('uName').textContent=u.name+(u.alive?`　耐久 ${Math.max(0,Math.round(u.hp))}/${u.maxhp}`:'（緊急脱出）');
   $('uTag').hidden=!u.help;
   $('uHp').style.width=(u.hp/u.maxhp*100)+'%';
-  $('uStats').innerHTML=[['行動',u.apMax],['トリオン',u.tr],['攻撃',u.atk],['防御',u.def],['回避',u.eva],['援護',u.sup],['技術',u.tec],['耐久',Math.max(0,Math.round(u.hp))+'/'+u.maxhp]]
+  $('uStats').innerHTML=[['行動',u.apMax],['トリオン',u.tr],['攻撃',u.atk],['防御',u.def],['回避',u.eva],['援護',u.sup],['技術',u.tec]]
     .map(([k,v])=>`<div><span>${k}</span><b>${v}</b></div>`).join('');
   $('uTrig').innerHTML=`<span class="m">メイン ${u.main}</span><span class="s">サブ ${u.sub}</span>`+u.skills.map(s=>`<span class="k">${s}</span>`).join('');
-  if(phase==='plan'){ const c=pathCost(u); $('uAp').innerHTML=`行動力 <b>${u.apMax}</b> ／ 移動 <b>${c}</b> ／ 攻撃・防御用 <b>${u.apMax-c}</b>`; }
+  if(phase==='plan'){const c=pathCost(u); $('uAp').innerHTML=`行動力 <b>${u.apMax}</b> ／ 移動 <b>${c}</b> ／ 攻撃・防御用 <b>${u.apMax-c}</b>`;}
   else $('uAp').innerHTML=`残り行動力 <b>${u.ap}</b>`;
-  const ef=endFace(u), pad=$('pad'); pad.innerHTML='';
-  PAD.forEach(d=>{ const b=document.createElement('button');
-    b.textContent=d<0?'・':ARROW[d]; b.disabled=!planning;
-    b.title=d<0?'移動方向のまま':'この向きで止まる';
-    if(d>=0&&u.planFace===d) b.classList.add('on');
-    if(d<0&&u.planFace==null) b.classList.add('on');
-    b.onclick=()=>{u.planFace=d<0?null:d; u.planned=true; renderPanel(); renderChips();};
-    pad.appendChild(b); });
+  const deg=toDeg(phase==='plan'?endFace(u):u.face);
+  $('faceSlider').value=deg;
+  $('faceDeg').textContent=`${deg}°`+(u.planFace==null&&phase==='plan'?(u.path.length?'（移動方向）':'（今の向き）'):'');
 }
-function renderLog(){ $('log').innerHTML=logs.slice(0,60).map(l=>`<div class="${l.cls||''}">${l.text}</div>`).join(''); }
+function renderLog(){$('log').innerHTML=logs.slice(0,60).map(l=>`<div class="${l.cls||''}">${l.text}</div>`).join('');}
+function setPlanFace(a){ if(!sel||phase!=='plan') return; sel.planFace=a; sel.planned=true; renderPanel(); renderChips(); }
 
 $('clearPath').onclick=()=>{ if(sel){sel.path=[]; sel.planFace=null; sel.planned=false; renderPanel(); renderChips();} };
 $('autoPlan').onclick=()=>{ planTeam('P',true); renderPanel(); renderChips(); };
 $('ready').onclick=()=>execute();
 $('again').onclick=()=>newGame();
 $('optTimer').onchange=updateHud;
+$('faceSlider').oninput=e=>setPlanFace(fromDeg(+e.target.value));
+$('faceTap').onclick=()=>{aiming=!aiming; renderPanel();};
+$('faceAuto').onclick=()=>{ if(sel){sel.planFace=null; renderPanel(); renderChips();} };
 document.addEventListener('pointerdown',()=>{started=true;},{once:true});
 setInterval(()=>{
   if(phase!=='plan'||!started||!$('optTimer').checked) return;
-  timeLeft--; if(timeLeft<=0){ timeLeft=0; planTeam('P',true); execute(); }
+  timeLeft--; if(timeLeft<=0){timeLeft=0; planTeam('P',true); execute();}
   updateHud();
 },1000);
 
 // ---------- canvas ----------
 const cv=$('map'), ctx=cv.getContext('2d'), rv=$('radar'), rctx=rv.getContext('2d');
-let W=600, cs=25;
+const layer=document.createElement('canvas'), lctx=layer.getContext('2d');
+let W=600, K=24, OX=0, OY=0, DPR=1;
+function pix(x,y){const [ux,uy]=P(x,y); return [OX+(ux+.5)*K, OY+(uy+HR)*K];}
+function fpix(fx,fy){return [OX+(fx+.5)*K, OY+(fy+HR)*K];}
 function resize(){
-  const r=$('board').getBoundingClientRect(), dpr=window.devicePixelRatio||1;
-  W=r.width; cs=W/N;
-  cv.width=Math.round(W*dpr); cv.height=Math.round(W*dpr); ctx.setTransform(dpr,0,0,dpr,0,0);
-  const rr=rv.getBoundingClientRect(); rv.width=Math.round(rr.width*dpr); rv.height=Math.round(rr.height*dpr); rctx.setTransform(dpr,0,0,dpr,0,0);
+  const r=$('board').getBoundingClientRect(); DPR=window.devicePixelRatio||1;
+  W=r.width; K=Math.min(W/WU, r.height/HU); OX=(W-WU*K)/2; OY=(r.height-HU*K)/2;
+  cv.width=Math.round(W*DPR); cv.height=Math.round(r.height*DPR); ctx.setTransform(DPR,0,0,DPR,0,0);
+  const rr=rv.getBoundingClientRect(); rv.width=Math.round(rr.width*DPR); rv.height=Math.round(rr.height*DPR); rctx.setTransform(DPR,0,0,DPR,0,0);
+  buildMapLayer();
 }
 new ResizeObserver(resize).observe($('board'));
 
-cv.addEventListener('pointerdown',ev=>{
-  if(phase!=='plan') return;
-  const r=cv.getBoundingClientRect(), x=Math.floor((ev.clientX-r.left)/cs), y=Math.floor((ev.clientY-r.top)/cs);
-  if(!inb(x,y)) return;
-  const o=unitAt(x,y);
-  if(o&&o.team==='P'){ sel=o; renderChips(); renderPanel(); return; }
-  const u=sel; if(!u||!u.alive) return;
-  const [sx,sy]=pathEnd(u);
-  if(sx===x&&sy===y) return;
-  const {prev}=dijkstra(u,sx,sy), p=trace(prev,sx,sy,x,y);
-  if(!p){ log(`${u.short}：そこへは上れません`,'sys'); return; }
-  let budget=u.apMax-pathCost(u), px=sx, py=sy, added=0;
-  for(const [cx,cy] of p){ const c=stepCost(u,px,py,cx,cy); if(c>budget) break; budget-=c; u.path.push([cx,cy]); px=cx; py=cy; added++; }
-  if(!added) log(`${u.short}：行動力が足りません`,'sys');
-  u.planned=true; renderPanel(); renderChips();
-});
-
-const HCOL=['#10222a','#22414a','#2d5560','#3a6b78','#48838f'];
-function drawMap(){
-  ctx.fillStyle='#081014'; ctx.fillRect(0,0,W,W);
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++){
-    const h=H[idx(x,y)];
-    ctx.fillStyle=HCOL[h]; ctx.fillRect(x*cs,y*cs,cs+.5,cs+.5);
-    if(h>0){ ctx.fillStyle='rgba(255,255,255,.05)'; ctx.fillRect(x*cs,y*cs,cs,cs*.18); }
+function hexPath(c,cx,cy,r){ c.beginPath(); for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-30); const px=cx+r*Math.cos(a), py=cy+r*Math.sin(a); i?c.lineTo(px,py):c.moveTo(px,py);} c.closePath(); }
+const HCOL={0:'#eef2f6',1:'#8ef06c',2:'#43c27b',3:'#f4ef4c',4:'#f6c54a',5:'#ef4f4f',[WALL]:'#5c6168'};
+function buildMapLayer(){
+  if(!H.length) return;
+  layer.width=cv.width; layer.height=cv.height; lctx.setTransform(DPR,0,0,DPR,0,0);
+  lctx.fillStyle='#dfe7f1'; lctx.fillRect(0,0,W,cv.height/DPR);
+  const r=K*HR;
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const [cx,cy]=pix(x,y), h=H[idx(x,y)], edge=x===0||y===0||x===COLS-1||y===ROWS-1;
+    hexPath(lctx,cx,cy,r*.98); lctx.fillStyle=edge&&h===0?'#a9c1e4':HCOL[h]; lctx.fill();
+    hexPath(lctx,cx,cy,r*.82); lctx.strokeStyle=h?'rgba(0,0,0,.08)':'rgba(70,100,140,.45)'; lctx.lineWidth=Math.max(.8,K*.06); lctx.stroke();
   }
-  ctx.strokeStyle='rgba(120,200,210,.07)'; ctx.lineWidth=1; ctx.beginPath();
-  for(let i=0;i<=N;i++){ ctx.moveTo(i*cs,0); ctx.lineTo(i*cs,W); ctx.moveTo(0,i*cs); ctx.lineTo(W,i*cs); }
-  ctx.stroke();
-  ctx.strokeStyle='rgba(180,235,240,.35)'; ctx.lineWidth=1.2; ctx.beginPath();
-  for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const h=H[idx(x,y)];
-    if(x+1<N&&H[idx(x+1,y)]!==h){ctx.moveTo((x+1)*cs,y*cs);ctx.lineTo((x+1)*cs,(y+1)*cs);}
-    if(y+1<N&&H[idx(x,y+1)]!==h){ctx.moveTo(x*cs,(y+1)*cs);ctx.lineTo((x+1)*cs,(y+1)*cs);} }
-  ctx.stroke();
-  if(cs>=18){ ctx.fillStyle='rgba(220,235,239,.35)'; ctx.font=`${Math.floor(cs*.32)}px "Share Tech Mono",monospace`; ctx.textAlign='right'; ctx.textBaseline='bottom';
-    for(let y=0;y<N;y++) for(let x=0;x<N;x++){ const h=H[idx(x,y)]; if(h) ctx.fillText(h,(x+1)*cs-2,(y+1)*cs-1); } }
+  // 高さが変わる境目を太線で
+  lctx.strokeStyle='rgba(30,40,55,.55)'; lctx.lineWidth=Math.max(1,K*.07); lctx.beginPath();
+  for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){
+    const [cx,cy]=pix(x,y), h=H[idx(x,y)], nb=(y&1)?NB_ODD:NB_EVEN;
+    if(!h) continue;
+    nb.forEach(([dx,dy],i)=>{ const nx=x+dx, ny=y+dy; if(inb(nx,ny)&&H[idx(nx,ny)]===h) return;
+      const a1=Math.PI/180*(60*i-30), a2=Math.PI/180*(60*i+30);
+      lctx.moveTo(cx+r*Math.cos(a1),cy+r*Math.sin(a1)); lctx.lineTo(cx+r*Math.cos(a2),cy+r*Math.sin(a2)); });
+  }
+  lctx.stroke();
+  // 大通り
+  lctx.strokeStyle='rgba(47,111,200,.8)'; lctx.lineWidth=Math.max(1.5,K*.1); lctx.beginPath();
+  const [vx1]=pix(11,0), [vx2]=pix(12,0), [,hy1]=pix(0,13), [,hy2]=pix(0,14);
+  for(const vx of [vx1-K*.25,vx2+K*.75]){lctx.moveTo(vx,OY);lctx.lineTo(vx,OY+HU*K);}
+  for(const hy of [hy1-K*S3/4,hy2+K*S3/4]){lctx.moveTo(OX,hy);lctx.lineTo(OX+WU*K,hy);}
+  lctx.stroke();
+  if(K>=16){ lctx.fillStyle='rgba(0,0,0,.35)'; lctx.font=`${Math.floor(K*.34)}px "Share Tech Mono",monospace`; lctx.textAlign='center'; lctx.textBaseline='middle';
+    for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++){const h=H[idx(x,y)]; if(h&&h<WALL){const [cx,cy]=pix(x,y); lctx.fillText(h,cx,cy);}} }
 }
 function drawFog(vis){
-  ctx.fillStyle='rgba(3,8,10,.55)';
-  for(let i=0;i<N*N;i++) if(!vis[i]) ctx.fillRect((i%N)*cs,((i/N)|0)*cs,cs+.5,cs+.5);
+  ctx.fillStyle='rgba(20,30,48,.42)';
+  for(let i=0;i<NC;i++) if(!vis[i]){const [cx,cy]=pix(i%COLS,(i/COLS)|0); hexPath(ctx,cx,cy,K*HR+.6); ctx.fill();}
 }
-function fan(cx,cy,face,deg,range,fill,stroke){
-  const a=Math.atan2(DIRS[face][1],DIRS[face][0]), h=deg/2*Math.PI/180;
-  const px=(cx+.5)*cs, py=(cy+.5)*cs;
-  ctx.beginPath(); ctx.moveTo(px,py); ctx.arc(px,py,range*cs,a-h,a+h); ctx.closePath();
-  ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=1.2; ctx.stroke();
+function fan(px,py,face,deg,range,fill,stroke){
+  const h=deg/2*Math.PI/180;
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.arc(px,py,range*K,face-h,face+h); ctx.closePath();
+  ctx.fillStyle=fill; ctx.fill(); ctx.strokeStyle=stroke; ctx.lineWidth=1.3; ctx.stroke();
 }
-function drawFans(u,x,y,face){
+function drawFans(u,px,py,face){
   [u.main,u.sub].forEach((tn,slot)=>{ const t=TRIG[tn];
-    if(t.atk) fan(x,y,face,t.fan,rangeOf(u,t),slot?'rgba(180,140,255,.10)':'rgba(242,177,52,.12)',slot?'rgba(180,140,255,.6)':'rgba(242,177,52,.7)');
-    else if(t.shieldFan) fan(x,y,face,t.shieldFan,1.4,'rgba(127,227,255,.18)','rgba(127,227,255,.7)');
-    else if(t.evadeFan) fan(x,y,face,t.evadeFan,1.4,'rgba(111,212,154,.14)','rgba(111,212,154,.6)');
-    if(t.shield&&t.atk) fan(x,y,face,t.shieldFan,1.2,'rgba(127,227,255,.14)','rgba(127,227,255,.5)');
+    if(t.atk) fan(px,py,face,t.fan,rangeOf(u,t),slot?'rgba(140,90,230,.18)':'rgba(70,170,70,.32)',slot?'rgba(110,60,200,.8)':'rgba(30,110,40,.85)');
+    if(t.shieldFan) fan(px,py,face,t.shieldFan,t.atk?1.2:1.5,'rgba(70,120,220,.35)','rgba(40,80,170,.85)');
+    if(t.evadeFan) fan(px,py,face,t.evadeFan,1.5,'rgba(60,160,190,.25)','rgba(30,110,140,.8)');
   });
 }
 function drawPath(u,alpha){
   if(!u.path.length) return;
-  ctx.strokeStyle=`rgba(79,179,255,${alpha})`; ctx.lineWidth=2; ctx.setLineDash([4,4]);
-  ctx.beginPath(); ctx.moveTo((u.x+.5)*cs,(u.y+.5)*cs);
-  for(const [x,y] of u.path) ctx.lineTo((x+.5)*cs,(y+.5)*cs);
-  ctx.stroke(); ctx.setLineDash([]);
-  const [ex,ey]=pathEnd(u);
-  ctx.strokeStyle=`rgba(79,179,255,${alpha})`; ctx.strokeRect(ex*cs+2,ey*cs+2,cs-4,cs-4);
+  ctx.strokeStyle=`rgba(230,140,0,${alpha})`; ctx.lineWidth=Math.max(2,K*.14); ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(...pix(u.x,u.y));
+  for(const [x,y] of u.path) ctx.lineTo(...pix(x,y));
+  ctx.stroke();
+  const [ex,ey]=pix(...pathEnd(u)); hexPath(ctx,ex,ey,K*HR*.9); ctx.strokeStyle=`rgba(230,140,0,${alpha})`; ctx.lineWidth=2; ctx.stroke();
 }
-function drawUnit(u){
-  const px=(u.rx+.5)*cs, py=(u.ry+.5)*cs, r=cs*.38;
-  const col=u.team==='P'?'#4fb3ff':'#ff6b5a';
-  const a=Math.atan2(DIRS[u.face][1],DIRS[u.face][0]);
-  ctx.strokeStyle=col; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+Math.cos(a)*r*1.5,py+Math.sin(a)*r*1.5); ctx.stroke();
-  ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.fillStyle=u.team==='P'?'#123a57':'#4a1a17'; ctx.fill();
-  ctx.lineWidth=1.5; ctx.strokeStyle=col; ctx.stroke();
-  ctx.beginPath(); ctx.arc(px,py,r+2.5,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,u.hp/u.maxhp)); ctx.strokeStyle=u.hp/u.maxhp>.4?'#6fd49a':'#ffb347'; ctx.lineWidth=2; ctx.stroke();
-  ctx.fillStyle='#fff'; ctx.font=`700 ${Math.max(9,Math.floor(cs*.42))}px "Zen Kaku Gothic New",sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(u.short,px,py+1);
-  if(u===sel){ ctx.strokeStyle='#f2b134'; ctx.lineWidth=2; ctx.strokeRect(u.rx*cs+1,u.ry*cs+1,cs-2,cs-2); }
+function drawUnitAt(u){
+  const [px,py]=u.pp, r=K*HR*.82, ally=u.team==='P';
+  ctx.strokeStyle=ally?'#2f6fc8':'#b3261e'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(px+Math.cos(u.rface)*r*1.6,py+Math.sin(u.rface)*r*1.6); ctx.stroke();
+  ctx.beginPath(); ctx.arc(px,py,r,0,Math.PI*2); ctx.fillStyle=ally?'#cfe2f7':'#e5483f'; ctx.fill();
+  ctx.lineWidth=1.5; ctx.strokeStyle=ally?'#5b8fd0':'#7a1510'; ctx.stroke();
+  ctx.beginPath(); ctx.arc(px,py,r+2.5,-Math.PI/2,-Math.PI/2+Math.PI*2*Math.max(0,u.hp/u.maxhp)); ctx.strokeStyle=u.hp/u.maxhp>.4?'#2b9a4a':'#e8590c'; ctx.lineWidth=2; ctx.stroke();
+  ctx.fillStyle=ally?'#1b2a3a':'#fff'; const fs=Math.max(8,Math.floor(r*.72)); ctx.font=`700 ${fs}px "Zen Kaku Gothic New",sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  const ch=[...u.short];
+  if(ch.length===1) ctx.fillText(ch[0],px,py+1); else { ctx.fillText(ch[0],px,py-fs*.48); ctx.fillText(ch[1],px,py+fs*.52); }
+  if(u===sel){ hexPath(ctx,px,py,K*HR*1.02); ctx.strokeStyle='#f08c00'; ctx.lineWidth=2.5; ctx.stroke(); }
 }
 function drawEffects(now){
   effects=effects.filter(e=>now-e.t0<e.dur);
   for(const e of effects){
-    const k=(now-e.t0)/e.dur;
-    ctx.save(); ctx.globalAlpha=1-k;
+    const k=(now-e.t0)/e.dur; ctx.save(); ctx.globalAlpha=1-k;
     if(e.type==='shot'){
-      ctx.strokeStyle=e.color; ctx.lineWidth=e.snipe?3:1.6; ctx.shadowColor=e.color; ctx.shadowBlur=e.snipe?12:4;
-      ctx.beginPath(); ctx.moveTo((e.x1+.5)*cs,(e.y1+.5)*cs); ctx.lineTo((e.x2+.5)*cs,(e.y2+.5)*cs); ctx.stroke();
+      const [x1,y1]=pix(e.x1,e.y1),[x2,y2]=pix(e.x2,e.y2);
+      ctx.strokeStyle=e.color; ctx.lineWidth=e.snipe?3.5:2; ctx.shadowColor=e.color; ctx.shadowBlur=e.snipe?12:4;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
     } else if(e.type==='slash'){
-      const px=(e.x2+.5)*cs, py=(e.y2+.5)*cs, a=Math.atan2(e.y2-e.y1,e.x2-e.x1);
-      ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.shadowColor=e.color; ctx.shadowBlur=10;
-      ctx.beginPath(); ctx.arc(px-Math.cos(a)*cs*.3,py-Math.sin(a)*cs*.3,cs*.6,a-1.1+k,a+0.2+k); ctx.stroke();
+      const [x1,y1]=pix(e.x1,e.y1),[px,py]=pix(e.x2,e.y2), a=Math.atan2(py-y1,px-x1);
+      ctx.strokeStyle='#fff'; ctx.lineWidth=3.5; ctx.shadowColor=e.color; ctx.shadowBlur=12;
+      ctx.beginPath(); ctx.arc(px-Math.cos(a)*K*.3,py-Math.sin(a)*K*.3,K*.6,a-1.1+k,a+.2+k); ctx.stroke();
     } else if(e.type==='text'){
-      ctx.fillStyle=e.color; ctx.font=`700 ${Math.max(11,cs*.5)}px "Share Tech Mono",monospace`; ctx.textAlign='center';
-      ctx.fillText(e.text,(e.x+.5)*cs,(e.y+.1)*cs-k*cs*.8);
+      const [px,py]=pix(e.x,e.y);
+      ctx.fillStyle=e.color; ctx.strokeStyle='rgba(255,255,255,.9)'; ctx.lineWidth=3; ctx.font=`700 ${Math.max(11,K*.55)}px "Share Tech Mono",monospace`; ctx.textAlign='center';
+      ctx.strokeText(e.text,px,py-K*.5-k*K*.8); ctx.fillText(e.text,px,py-K*.5-k*K*.8);
     } else if(e.type==='shield'){
-      const a=Math.atan2(DIRS[e.face][1],DIRS[e.face][0]);
-      ctx.strokeStyle='#7fe3ff'; ctx.lineWidth=3; ctx.shadowColor='#7fe3ff'; ctx.shadowBlur=10;
-      ctx.beginPath(); ctx.arc((e.x+.5)*cs,(e.y+.5)*cs,cs*.62,a-1,a+1); ctx.stroke();
+      const [px,py]=pix(e.x,e.y);
+      ctx.strokeStyle='#1c7ed6'; ctx.lineWidth=4; ctx.shadowColor='#4dabf7'; ctx.shadowBlur=10;
+      ctx.beginPath(); ctx.arc(px,py,K*.62,e.face-1,e.face+1); ctx.stroke();
     } else if(e.type==='blast'){
-      ctx.fillStyle='rgba(255,180,90,.35)'; ctx.beginPath(); ctx.arc((e.x+.5)*cs,(e.y+.5)*cs,(e.r+.5)*cs*(.4+k*.6),0,Math.PI*2); ctx.fill();
+      const [px,py]=pix(e.x,e.y);
+      ctx.fillStyle='rgba(255,140,40,.4)'; ctx.beginPath(); ctx.arc(px,py,(e.r+.5)*K*(.4+k*.6),0,Math.PI*2); ctx.fill();
     } else if(e.type==='bail'){
-      const px=(e.x+.5)*cs, py=(e.y+.5)*cs, top=py-(py+cs)*Math.min(1,k*1.6);
+      const [px,py]=pix(e.x,e.y), top=py-(py+K)*Math.min(1,k*1.6);
       const g=ctx.createLinearGradient(0,top,0,py); g.addColorStop(0,'rgba(255,255,255,0)'); g.addColorStop(1,e.color);
-      ctx.fillStyle=g; ctx.shadowColor=e.color; ctx.shadowBlur=18; ctx.fillRect(px-cs*.18,top,cs*.36,py-top);
-      ctx.globalAlpha=Math.min(1,(1-k)*2); ctx.fillStyle='#fff'; ctx.font=`900 ${Math.max(11,cs*.55)}px "Zen Kaku Gothic New",sans-serif`; ctx.textAlign='center';
-      ctx.fillText('緊急脱出',px,py-cs*.8);
+      ctx.fillStyle=g; ctx.shadowColor=e.color; ctx.shadowBlur=18; ctx.fillRect(px-K*.18,top,K*.36,py-top);
+      ctx.globalAlpha=Math.min(1,(1-k)*2); ctx.fillStyle='#10202c'; ctx.strokeStyle='#fff'; ctx.lineWidth=3;
+      ctx.font=`900 ${Math.max(11,K*.6)}px "Zen Kaku Gothic New",sans-serif`; ctx.textAlign='center';
+      ctx.strokeText('緊急脱出',px,py-K*.9); ctx.fillText('緊急脱出',px,py-K*.9);
     }
     ctx.restore();
   }
 }
 function drawRadar(){
-  const s=rv.getBoundingClientRect().width, c=s/N;
+  const s=rv.getBoundingClientRect().width, c=s/WU;
   rctx.clearRect(0,0,s,s);
   rctx.strokeStyle='rgba(111,212,154,.18)'; rctx.beginPath();
-  for(let i=1;i<4;i++){ rctx.moveTo(i*s/4,0); rctx.lineTo(i*s/4,s); rctx.moveTo(0,i*s/4); rctx.lineTo(s,i*s/4); }
+  for(let i=1;i<4;i++){rctx.moveTo(i*s/4,0);rctx.lineTo(i*s/4,s);rctx.moveTo(0,i*s/4);rctx.lineTo(s,i*s/4);}
   rctx.stroke();
-  for(const u of units){ if(!u.alive) continue;
-    if(u.team==='E'&&hasTrig(u,'バッグワーム')) continue;
+  for(const u of units){ if(!u.alive||(u.team==='E'&&hasTrig(u,'バッグワーム'))) continue;
+    const [ux,uy]=P(u.x,u.y);
     rctx.fillStyle=u.team==='P'?'#4fb3ff':'#ff6b5a';
-    rctx.beginPath(); rctx.arc((u.rx+.5)*c,(u.ry+.5)*c,Math.max(1.8,c*.45),0,Math.PI*2); rctx.fill(); }
+    rctx.beginPath(); rctx.arc((ux+.5)*c,(uy+HR)*c,Math.max(1.8,c*.45),0,Math.PI*2); rctx.fill(); }
 }
+function lerpAng(a,b,t){let d=((b-a+Math.PI)%(2*Math.PI)+2*Math.PI)%(2*Math.PI)-Math.PI; return a+d*t;}
 function frame(now){
-  if(units.length){
-    for(const u of units){ u.rx+=(u.x-u.rx)*.18; u.ry+=(u.y-u.ry)*.18; }
-    drawMap();
-    const vis=phase==='end'?new Uint8Array(N*N).fill(1):visibleCells('P');
+  if(units.length&&layer.width){
+    ctx.clearRect(0,0,W,cv.height/DPR); ctx.drawImage(layer,0,0,W,cv.height/DPR);
+    for(const u of units){
+      const [tx,ty]=pix(u.x,u.y); if(!u.pp) u.pp=[tx,ty];
+      u.pp=[u.pp[0]+(tx-u.pp[0])*.18, u.pp[1]+(ty-u.pp[1])*.18];
+      u.rface=lerpAng(u.rface,u.face,.15);
+    }
+    const vis=phase==='end'?new Uint8Array(NC).fill(1):visibleCells('P');
     drawFog(vis);
-    if(phase==='plan') for(const u of units) if(u.alive&&u.team==='P') drawPath(u,u===sel?.9:.35);
-    if(sel&&sel.alive){ if(phase==='plan'){ const [ex,ey]=pathEnd(sel); drawFans(sel,ex,ey,endFace(sel)); } else drawFans(sel,sel.x,sel.y,sel.face); }
+    if(phase==='plan') for(const u of units) if(u.alive&&u.team==='P') drawPath(u,u===sel?.95:.4);
+    if(sel&&sel.alive){ if(phase==='plan'){const [ex,ey]=pathEnd(sel); drawFans(sel,...pix(ex,ey),endFace(sel));} else drawFans(sel,...sel.pp,sel.rface); }
     const seen=teamVisibleEnemies('P');
-    for(const u of units) if(u.alive&&(u.team==='P'||seen.has(u.id)||phase==='end')) drawUnit(u);
-    drawEffects(now);
-    drawRadar();
+    for(const u of units) if(u.alive&&(u.team==='P'||seen.has(u.id)||phase==='end')) drawUnitAt(u);
+    drawEffects(now); drawRadar();
   }
   requestAnimationFrame(frame);
 }
+
+// 入力：経路追加・向き指定
+function eventUnits(ev){ const r=cv.getBoundingClientRect(); return [(ev.clientX-r.left-OX)/K-.5, (ev.clientY-r.top-OY)/K-HR]; }
+let dragging=false;
+function aimAt(ev){ const [ux,uy]=eventUnits(ev), [ex,ey]=pathEnd(sel), [px,py]=P(ex,ey); if(Math.hypot(ux-px,uy-py)<.2) return; setPlanFace(Math.atan2(uy-py,ux-px)); }
+cv.addEventListener('pointerdown',ev=>{
+  if(phase!=='plan') return;
+  if(aiming&&sel&&sel.alive){ dragging=true; cv.setPointerCapture(ev.pointerId); aimAt(ev); return; }
+  const [ux,uy]=eventUnits(ev), [x,y]=toHex(ux,uy);
+  if(!inb(x,y)) return;
+  const o=unitAt(x,y);
+  if(o&&o.team==='P'){sel=o; renderChips(); renderPanel(); return;}
+  const u=sel; if(!u||!u.alive) return;
+  const [sx,sy]=pathEnd(u); if(sx===x&&sy===y) return;
+  const {prev}=dijkstra(u,sx,sy), p=trace(prev,sx,sy,x,y);
+  if(!p){log(`${u.short}：そこへは行けません`,'sys'); return;}
+  let budget=u.apMax-pathCost(u), px=sx, py=sy, added=0;
+  for(const [cx,cy] of p){const c=stepCost(u,px,py,cx,cy); if(c>budget) break; budget-=c; u.path.push([cx,cy]); px=cx; py=cy; added++;}
+  if(!added) log(`${u.short}：行動力が足りません`,'sys');
+  u.planned=true; renderPanel(); renderChips();
+});
+cv.addEventListener('pointermove',ev=>{ if(dragging&&aiming) aimAt(ev); });
+cv.addEventListener('pointerup',()=>{ if(dragging){dragging=false; aiming=false; renderPanel();} });
 
 newGame(); resize(); requestAnimationFrame(frame);
 })();
