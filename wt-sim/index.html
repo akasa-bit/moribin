@@ -157,7 +157,7 @@ details.rules ul{padding-left:18px;margin:6px 0}
             <li>作戦タイム（150秒）で全ユニットの経路と向きを決め、その後15秒で全員が同時に動きます。これを6ターン行います。</li>
             <li>マップは六角マスです。1マス移動で行動力1、建物を1段上るごとに行動力+1。一度に上れるのは2段まで（グラスホッパー装備なら4段）。</li>
             <li>メイン・サブのトリガーにはそれぞれ扇形の範囲があり、範囲に敵が入ると自動で攻撃します（攻撃にも行動力を使います）。</li>
-            <li>シールドは向いている側からの攻撃だけ防ぎます。バッグワーム装備の敵はレーダーに映りません。</li>
+            <li>シールドは向いている側からの攻撃だけ防ぎます。バッグワーム装備の敵はレーダーに映りませんが、攻撃すると撃たれた側に位置が知られます。</li>
             <li>6ターン終了時に生存数で2体以上の差をつけた側の勝ちです。</li>
             <li>建物の色は高さを表します（黄緑1、緑2、黄3、橙4、赤5、灰色は立入不可）。</li>
             <li>雨取以外のパラメータとダメージ計算は仮の数値です。</li>
@@ -279,9 +279,10 @@ function hasTrig(u,t){return u.main===t||u.sub===t;}
 function climbMax(u){return hasTrig(u,'グラスホッパー')?4:2;}
 function stepCost(u,ax,ay,bx,by){const hb=H[idx(bx,by)]; if(hb>=WALL) return Infinity; const dh=hb-H[idx(ax,ay)]; if(dh>climbMax(u)) return Infinity; return 1+Math.max(0,dh);}
 function unitAt(x,y){return units.find(u=>u.alive&&u.x===x&&u.y===y);}
-function rangeOf(u,t){
+function rangeOf(u,t){return rangeAt(u,t,u.x,u.y);}
+function rangeAt(u,t,x,y){
   let r=t.range;
-  if(t.kind==='snipe'){ r+=Math.floor(H[idx(u.x,u.y)]/2); if(has(u,'精密狙撃')) r+=2; }
+  if(t.kind==='snipe'){ r+=Math.floor(H[idx(x,y)]/2); if(has(u,'精密狙撃')) r+=2; }
   if(t.kind==='shoot'||t.kind==='snipe'){ if(has(u,'トリオン・大')) r+=1; if(has(u,'トリオン・極大')) r+=2; }
   return r;
 }
@@ -340,32 +341,132 @@ const toDeg=a=>Math.round(((a*180/Math.PI+90)%360+360)%360);
 const fromDeg=d=>(d-90)*Math.PI/180;
 
 // ---------- AI ----------
+// 部隊AI：情報（視界・レーダー・記憶）→ 脅威マップ → 集中目標と作戦方針 → 各ユニットの配置と向き
+const memory={P:new Map(),E:new Map()};
+function updateMemory(team){
+  const seen=teamVisibleEnemies(team), m=memory[team];
+  for(const e of units){ if(e.team===team) continue;
+    if(!e.alive){m.delete(e.id); continue;}
+    if(seen.has(e.id)||!hasTrig(e,'バッグワーム')) m.set(e.id,{x:e.x,y:e.y,turn});
+  }
+}
+function knownFoes(team){
+  updateMemory(team);
+  const out=[];
+  for(const [id,m] of memory[team]){ const e=units.find(u=>u.id===id); if(e&&e.alive) out.push({e,x:m.x,y:m.y,age:turn-m.turn}); }
+  return out;
+}
+const DUMMY={eva:3,def:3,tr:6,main:'弧月',sub:'弧月',skills:[]};
+function expDamage(u,t,e){
+  let hit=t.acc+u.tec*3-e.eva*5;
+  if(t.kind==='snipe'&&has(u,'精密狙撃')) hit+=15;
+  hit=Math.max(10,Math.min(95,hit)); if(t.kind==='snipe'&&has(u,'感覚狙撃')) hit=95;
+  let d=(t.pow+(t.kind==='blade'?u.atk*t.sc:u.tr*t.sc))*(1-e.def*.04);
+  const sh=[e.main,e.sub].map(n=>TRIG[n]).find(x=>x.shield);
+  if(sh) d=Math.max(0,d-(sh.shield+e.tr*sh.shieldSc)*(t.pierce||1)*.5); // 半分くらいはシールドの向きの外から当たる想定
+  return hit/100*d;
+}
+function threatMap(foes){
+  const th=new Float32Array(NC);
+  for(const f of foes){
+    const e=f.e, {dist:dd}=dijkstra(e,f.x,f.y);
+    for(const tn of [e.main,e.sub]){ const t=TRIG[tn]; if(!t.atk) continue;
+      const move=Math.max(0,e.apMax-t.ap), dmg=expDamage(e,t,DUMMY), rg=rangeAt(e,t,f.x,f.y);
+      for(let i=0;i<NC;i++){
+        const cx=i%COLS, cy=(i/COLS)|0, d=dist(f,{x:cx,y:cy});
+        let w=0;
+        if(t.kind==='blade') w=dd[i]-1<=move?1:dd[i]-1<=move+4?.3:0;
+        else if(t.kind==='snipe') w=d<=rg?(los(f.x,f.y,cx,cy)?1:.15):d<=rg+3?.25:0;
+        else if(d<=rg+move*.6) w=(t.noLOS||d>rg||los(f.x,f.y,cx,cy))?1:.4;
+        th[i]+=w*dmg;
+      }
+    }
+  }
+  return th;
+}
+function roleOf(u){return TRIG[u.main].kind;}
+function idealDist(u){const t=TRIG[u.main], r=roleOf(u); return r==='blade'?1:r==='snipe'?Math.min(10,rangeOf(u,t)-2):rangeOf(u,t)-1;}
+function stageDist(u){const r=roleOf(u); return r==='blade'?6:r==='snipe'?Math.min(10,rangeOf(u,TRIG[u.main])-2):r==='gun'?6:7;}
+// このターン中に u が f を攻撃できるか（届く位置まで動けるか）と、その期待ダメージ
+function potential(u,f,dd){
+  let best=0;
+  for(const tn of [u.main,u.sub]){ const t=TRIG[tn]; if(!t.atk) continue;
+    const budget=u.apMax-t.ap;
+    for(let i=0;i<NC;i++){ if(dd[i]>budget) continue;
+      const cx=i%COLS, cy=(i/COLS)|0, rg=rangeAt(u,t,cx,cy);
+      if(dist(f,{x:cx,y:cy})>rg) continue;
+      if(!t.noLOS&&!los(cx,cy,f.x,f.y)) continue;
+      best=Math.max(best,expDamage(u,t,f.e)*(t.kind==='blade'?2:1)); break;
+    }
+  }
+  return best;
+}
 function planTeam(team,onlyUnplanned){
-  const foes=units.filter(e=>e.alive&&e.team!==team), seen=teamVisibleEnemies(team);
-  const known=foes.filter(e=>seen.has(e.id)||!hasTrig(e,'バッグワーム'));
-  const reserved=new Set(units.filter(u=>u.alive&&u.team===team&&onlyUnplanned&&u.planned).map(u=>idx(...pathEnd(u))));
-  for(const u of units){
-    if(!u.alive||u.team!==team||(onlyUnplanned&&u.planned)) continue;
-    let tgt=null,bd=Infinity;
-    for(const e of known){const d=dist(u,e); if(d<bd){bd=d;tgt=e;}}
-    const goal=tgt||{x:11,y:13};
-    const t=TRIG[u.main], rg=rangeOf(u,t), budget=u.apMax-(t.kind==='snipe'?t.ap:4);
-    const {dist:dd,prev}=dijkstra(u,u.x,u.y);
+  const mine=units.filter(u=>u.alive&&u.team===team), foes=knownFoes(team);
+  const foesAlive=units.filter(u=>u.alive&&u.team!==team).length, lead=mine.length-foesAlive;
+  const dij=new Map(mine.map(u=>[u.id,dijkstra(u,u.x,u.y)]));
+  const threat=threatMap(foes);
+  // 集中目標：多くの味方が同時に叩けて、孤立していて、削れている敵
+  let focus=null, fs=-Infinity, focusReach=0;
+  for(const f of foes){
+    let reach=0, sum=0;
+    for(const u of mine){ const p=potential(u,f,dij.get(u.id).dist); if(p>0){reach++; sum+=p;} }
+    const iso=foes.filter(o=>o!==f&&dist(o,f)<=5).length;
+    const cx=mine.reduce((a,u)=>a+u.x,0)/mine.length, cy=mine.reduce((a,u)=>a+u.y,0)/mine.length;
+    const s=reach*1.5+(sum>=f.e.hp?3:0)+(1-f.e.hp/f.e.maxhp)*2-iso*1.1-dist(f,{x:cx,y:cy})*.08-f.age*.7+(roleOf(f.e)==='snipe'?.5:0);
+    if(s>fs){fs=s; focus=f; focusReach=reach;}
+  }
+  let mode='stage';
+  if(focus&&focusReach>=Math.min(3,Math.max(2,Math.ceil(mine.length/3)))) mode='engage';
+  if(turn>=4&&lead>=WIN_DIFF) mode='hold';
+  if(turn===TURNS&&lead<WIN_DIFF&&focus) mode='engage';
+  const rally=(()=>{ const cx=mine.reduce((a,u)=>a+u.x,0)/mine.length, cy=mine.reduce((a,u)=>a+u.y,0)/mine.length;
+    return {x:Math.round(cx+(11.5-cx)*.4), y:Math.round(cy+(13.5-cy)*.4)}; })();
+  const placed=[], reserved=new Set();
+  for(const u of mine) if(onlyUnplanned&&u.planned){ const [x,y]=pathEnd(u); placed.push({x,y}); reserved.add(idx(x,y)); }
+  const order={blade:0,gun:1,shoot:2,snipe:3};
+  const todo=mine.filter(u=>!(onlyUnplanned&&u.planned)).sort((a,b)=>order[roleOf(a)]-order[roleOf(b)]);
+  for(const u of todo){
+    const role=roleOf(u), main=TRIG[u.main], {dist:dd,prev}=dij.get(u.id);
+    const reserve=mode==='engage'&&role==='blade'?main.ap:main.ap*2;
+    const budget=Math.max(0,u.apMax-reserve);
+    const risk=mode==='hold'?1.2:mode==='engage'?(role==='blade'?.35:.6):.8;
     let best=idx(u.x,u.y), bs=-Infinity;
     for(let i=0;i<NC;i++){
       if(dd[i]>budget||reserved.has(i)) continue;
-      const cx=i%COLS, cy=(i/COLS)|0, o=unitAt(cx,cy); if(o&&o!==u) continue;
-      const d=dist({x:cx,y:cy},goal);
-      let s=t.kind==='snipe'?-Math.abs(d-Math.min(10,rg-2))+H[i]*1.3:t.kind==='blade'?-d:-Math.abs(d-(rg-1))+H[i]*.3;
-      s-=dd[i]*.05;
-      if(s>bs){bs=s;best=i;}
+      const cx=i%COLS, cy=(i/COLS)|0, c={x:cx,y:cy}, o=unitAt(cx,cy); if(o&&o!==u&&o.team===team) continue;
+      let off=0;
+      for(const tn of [u.main,u.sub]){ const t=TRIG[tn]; if(!t.atk) continue;
+        const rg=rangeAt(u,t,cx,cy); let wbest=0;
+        for(const f of foes){ const d=dist(c,f); if(d>rg||(!t.noLOS&&!los(cx,cy,f.x,f.y))) continue;
+          let v=expDamage(u,t,f.e); if(f===focus) v*=mode==='engage'?2.5:1.5; wbest=Math.max(wbest,v); }
+        off+=wbest;
+      }
+      let s=off-threat[i]*risk;
+      if(focus){ const d=dist(c,focus);
+        if(mode==='engage') s-=role==='blade'?d*2:Math.abs(d-idealDist(u))*.8;
+        else if(mode==='stage') s-=Math.abs(d-stageDist(u));
+        else s-=Math.max(0,d-idealDist(u)-3)*.3;
+      } else s-=dist(c,rally)*.6;
+      const near=placed.filter(p=>dist(p,c)<=3).length;
+      s+=Math.min(near,3)*.7; if(mode!=='engage'&&placed.length&&!near) s-=2;
+      s+=role==='snipe'?H[i]*1.2:role==='blade'?0:H[i]*.4;
+      s-=dd[i]*.03;
+      if(s>bs){bs=s; best=i;}
     }
-    reserved.add(best);
+    reserved.add(best); placed.push({x:best%COLS,y:(best/COLS)|0});
     u.path=trace(prev,u.x,u.y,best%COLS,(best/COLS)|0)||[];
     const [ex,ey]=pathEnd(u);
-    u.planFace=(ex===goal.x&&ey===goal.y)?null:angleTo(ex,ey,goal.x,goal.y);
+    // 向き：狙う敵 → いちばん近い既知の敵 → 集合地点
+    let look=null;
+    if(focus&&dist({x:ex,y:ey},focus)<=rangeAt(u,main,ex,ey)+3) look=focus;
+    else { let bd=Infinity; for(const f of foes){const d=dist({x:ex,y:ey},f); if(d<bd){bd=d; look=f;}} }
+    if(!look) look=rally;
+    u.planFace=(look.x===ex&&look.y===ey)?null:angleTo(ex,ey,look.x,look.y);
+    u.focusId=focus?focus.e.id:null;
     u.planned=true;
   }
+  return {mode,focus:focus&&focus.e};
 }
 
 // ---------- combat ----------
@@ -379,7 +480,7 @@ function declareAttacks(u,seen){
     for(const e of units){
       if(!e.alive||e.team===u.team||!inFan(u.x,u.y,u.face,t.fan,rg,e.x,e.y)) continue;
       if(t.noLOS?!seen.has(e.id):!los(u.x,u.y,e.x,e.y)) continue;
-      const d=dist(u,e)+e.hp/1000; if(d<bd){bd=d;tgt=e;}
+      const d=dist(u,e)*.1+e.hp/200-(e.id===u.focusId?2:0)-(expDamage(u,t,e)>=e.hp?3:0); if(d<bd){bd=d;tgt=e;}
     }
     if(!tgt) return;
     u.ap-=t.ap; u.cd[slot]=t.cd; out.push({u,t,tn,tgt});
@@ -405,6 +506,7 @@ function resolve(a,dmgMap){
   hit=Math.max(10,Math.min(95,hit));
   if(t.kind==='snipe'&&has(u,'感覚狙撃')) hit=95;
   fx({type:t.kind==='blade'?'slash':'shot',snipe:t.kind==='snipe',x1:u.x,y1:u.y,x2:e.x,y2:e.y,color:col,dur:t.kind==='snipe'?700:450});
+  memory[e.team].set(u.id,{x:u.x,y:u.y,turn}); // 撃たれた側には弾道で位置が知られる
   if(Math.random()*100>=hit){ fx({type:'text',x:e.x,y:e.y,text:'MISS',color:'#5b6b7a',dur:900}); log(`${u.short} ${tn} → ${e.short} 回避`,u.team==='P'?'p':'e'); return; }
   let dmg=(t.pow+(t.kind==='blade'?u.atk*t.sc:u.tr*t.sc))*(1-e.def*.04);
   const sh=shieldOf(e,u.x,u.y);
@@ -442,6 +544,7 @@ function doTick(){
     u.face=angleTo(u.x,u.y,nx,ny); u.x=nx; u.y=ny; u.ap-=c; u.path.shift(); acted=true;
     if(!u.path.length&&u.planFace!=null) u.face=u.planFace;
   }
+  updateMemory('P'); updateMemory('E');
   const seenBy={P:teamVisibleEnemies('P'),E:teamVisibleEnemies('E')};
   const alive=units.filter(u=>u.alive);
   for(const group of [alive.filter(u=>has(u,'早撃ち')),alive.filter(u=>!has(u,'早撃ち'))]){
@@ -499,6 +602,7 @@ function newGame(){
   genMap(20260318+Math.floor(Math.random()*1000));
   units=[...ROSTER_P.map((r,i)=>mkUnit(r,'P',i)),...ROSTER_E.map((r,i)=>mkUnit(r,'E',i))];
   turn=1; phase='plan'; timeLeft=PLAN_SEC; effects=[]; logs=[]; aiming=false; sel=units[0];
+  memory.P.clear(); memory.E.clear();
   $('result').hidden=true;
   log('演習① 開始。作戦タイムです。','sys');
   buildMapLayer(); updateHud(); renderChips(); renderPanel();
@@ -547,7 +651,8 @@ function renderLog(){$('log').innerHTML=logs.slice(0,60).map(l=>`<div class="${l
 function setPlanFace(a){ if(!sel||phase!=='plan') return; sel.planFace=a; sel.planned=true; renderPanel(); renderChips(); }
 
 $('clearPath').onclick=()=>{ if(sel){sel.path=[]; sel.planFace=null; sel.planned=false; renderPanel(); renderChips();} };
-$('autoPlan').onclick=()=>{ planTeam('P',true); renderPanel(); renderChips(); };
+const MODE_LABEL={engage:'戦力を集中して攻撃',stage:'集結して機をうかがう',hold:'有利を守って待ち構える'};
+$('autoPlan').onclick=()=>{ const p=planTeam('P',true); log(`自動設定：${MODE_LABEL[p.mode]}${p.focus?`（目標 ${p.focus.short}）`:''}`,'sys'); renderPanel(); renderChips(); };
 $('ready').onclick=()=>execute();
 $('again').onclick=()=>newGame();
 $('optTimer').onchange=updateHud;
@@ -646,7 +751,7 @@ function drawUnitAt(u){
 function drawEffects(now){
   effects=effects.filter(e=>now-e.t0<e.dur);
   for(const e of effects){
-    const k=(now-e.t0)/e.dur; ctx.save(); ctx.globalAlpha=1-k;
+    const k=Math.max(0,(now-e.t0)/e.dur); ctx.save(); ctx.globalAlpha=1-k;
     if(e.type==='shot'){
       const [x1,y1]=pix(e.x1,e.y1),[x2,y2]=pix(e.x2,e.y2);
       ctx.strokeStyle=e.color; ctx.lineWidth=e.snipe?3.5:2; ctx.shadowColor=e.color; ctx.shadowBlur=e.snipe?12:4;
