@@ -24,7 +24,10 @@
     <button id="newgame" class="ghost">新しい銀河</button>
   </header>
   <main>
-    <canvas id="map"></canvas>
+    <div id="stage">
+      <canvas id="map"></canvas>
+      <div id="zoom"><button id="zoom-in" aria-label="拡大">＋</button><button id="zoom-out" aria-label="縮小">－</button><button id="zoom-fit" aria-label="全体表示">全体</button></div>
+    </div>
     <aside>
       <div id="panel"></div>
       <h3>航行中の入植船</h3>

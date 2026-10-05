@@ -38,55 +38,83 @@ export class GalaxyView {
     return best;
   }
 
+  zoomAt(factor, sx, sy) {
+    const [wx, wy] = this.toWorld(sx, sy);
+    this.cam.zoom = clamp(this.cam.zoom * factor, 1.5, 80);
+    this.cam.x = wx - (sx - this.w / 2) / this.cam.zoom;
+    this.cam.y = wy - (sy - this.h / 2) / this.cam.zoom;
+  }
+
+  // マウス・タッチ共通 (Pointer Events)。1本指=ドラッグ/タップ、2本指=ピンチズーム。
   bind() {
     const c = this.canvas;
     const pos = (e) => { const r = c.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    const pts = new Map();
+    let pinch = null;
     c.addEventListener('pointerdown', (e) => {
       if (this.app.view !== 'galaxy') return;
-      const [x, y] = pos(e);
-      this.drag = { x, y, cx: this.cam.x, cy: this.cam.y, moved: false };
+      pts.set(e.pointerId, pos(e));
       c.setPointerCapture(e.pointerId);
+      if (pts.size === 1) {
+        const [x, y] = pos(e);
+        this.drag = { x, y, cx: this.cam.x, cy: this.cam.y, moved: false };
+      } else if (pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), zoom: this.cam.zoom };
+        if (this.drag) this.drag.moved = true;
+      }
     });
     c.addEventListener('pointermove', (e) => {
       if (this.app.view !== 'galaxy') return;
       const [x, y] = pos(e);
+      if (pts.has(e.pointerId)) pts.set(e.pointerId, [x, y]);
+      if (pinch && pts.size === 2) {
+        const [a, b] = [...pts.values()];
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+        this.zoomAt((pinch.zoom * d / pinch.d) / this.cam.zoom, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+        return;
+      }
       if (this.drag) {
         const dx = x - this.drag.x;
         const dy = y - this.drag.y;
-        if (Math.hypot(dx, dy) > 4) this.drag.moved = true;
+        if (Math.hypot(dx, dy) > 6) this.drag.moved = true;
         if (this.drag.moved) {
           this.cam.x = this.drag.cx - dx / this.cam.zoom;
           this.cam.y = this.drag.cy - dy / this.cam.zoom;
         }
       }
-      this.hover = this.pick(x, y);
-      this.mouse = [x, y];
-      c.style.cursor = this.hover ? 'pointer' : this.drag?.moved ? 'grabbing' : 'default';
+      if (e.pointerType === 'mouse') {
+        this.hover = this.pick(x, y);
+        this.mouse = [x, y];
+        c.style.cursor = this.hover ? 'pointer' : this.drag?.moved ? 'grabbing' : 'default';
+      }
     });
-    c.addEventListener('pointerup', (e) => {
+    const end = (e) => {
       if (this.app.view !== 'galaxy') return;
       const [x, y] = pos(e);
-      if (this.drag && !this.drag.moved) {
+      const wasPinch = pts.size > 1;
+      pts.delete(e.pointerId);
+      if (pts.size < 2) pinch = null;
+      if (this.drag && !this.drag.moved && !wasPinch && e.type === 'pointerup') {
         const s = this.pick(x, y);
         if (s) this.app.selectSystem(s.id);
       }
-      this.drag = null;
-    });
+      if (pts.size === 0) this.drag = null;
+    };
+    c.addEventListener('pointerup', end);
+    c.addEventListener('pointercancel', end);
     c.addEventListener('dblclick', (e) => {
       if (this.app.view !== 'galaxy') return;
       const [x, y] = pos(e);
       const s = this.pick(x, y);
       if (s) this.app.openSystem(s.id);
     });
-    c.addEventListener('pointerleave', () => { this.hover = null; });
+    c.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse') this.hover = null; });
     c.addEventListener('wheel', (e) => {
       if (this.app.view !== 'galaxy') return;
       e.preventDefault();
       const [x, y] = pos(e);
-      const [wx, wy] = this.toWorld(x, y);
-      this.cam.zoom = clamp(this.cam.zoom * Math.exp(-e.deltaY * 0.0015), 1.5, 80);
-      this.cam.x = wx - (x - this.w / 2) / this.cam.zoom;
-      this.cam.y = wy - (y - this.h / 2) / this.cam.zoom;
+      this.zoomAt(Math.exp(-e.deltaY * 0.0015), x, y);
     }, { passive: false });
   }
 

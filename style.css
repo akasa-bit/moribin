@@ -6,7 +6,10 @@ header { display:flex; align-items:center; gap:16px; padding:8px 14px; backgroun
 h1 { margin:0; font-size:18px; letter-spacing:.1em; color:var(--accent); }
 #date { font-variant-numeric:tabular-nums; min-width:9em; }
 main { flex:1; display:flex; min-height:0; }
-canvas { flex:1; min-width:0; display:block; touch-action:none; }
+#stage { flex:1; min-width:0; min-height:0; position:relative; }
+canvas { position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+#zoom { position:absolute; left:12px; bottom:12px; display:flex; flex-direction:column; gap:6px; }
+#zoom button { min-width:46px; min-height:46px; font-size:18px; background:rgba(13,18,29,.85); }
 aside { width:340px; background:var(--panel); border-left:1px solid var(--line); padding:12px 14px; overflow-y:auto; }
 button { background:#17213a; color:var(--fg); border:1px solid #2a3a60; border-radius:5px; padding:5px 10px; font:inherit; cursor:pointer; }
 button:hover:not(:disabled) { background:#1f2d4f; }
@@ -39,3 +42,11 @@ ul.bodies li:hover, ul.bodies li.sel { background:#16213a; }
 .bar { display:block; height:3px; background:#1d2840; margin:2px 0; } .bar i { display:block; height:100%; background:#ffb347; }
 #log { font-size:12px; } #log div { margin-bottom:2px; }
 @media (max-width: 800px) { main { flex-direction:column; } aside { width:auto; max-height:45%; border-left:0; border-top:1px solid var(--line); } }
+
+@media (pointer: coarse) {
+  button { min-height:40px; padding:6px 14px; }
+  ul.bodies li { padding:9px 8px; }
+  select { padding:9px; font-size:16px; }
+}
+html, body { height:100%; }
+[hidden] { display:none!important; }

@@ -24,6 +24,7 @@ const app = {
     $('tab-galaxy').classList.toggle('on', v === 'galaxy');
     $('tab-system').classList.toggle('on', v === 'system');
     canvas.style.cursor = 'default';
+    $('zoom').hidden = v !== 'galaxy';
     this.dirty = true;
   },
 };
@@ -32,7 +33,7 @@ function newGame(seed) {
   const galaxy = generateGalaxy({ seed, starCount: 400, meanSpacing: 4 });
   app.game = new Game(galaxy);
   app.sel = { sys: 0, body: null };
-  history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`);
+  try { history.replaceState(null, '', `?seed=${encodeURIComponent(seed)}`); } catch { /* 埋め込み環境では無視 */ }
   galaxyView.fit();
   app.dirty = true;
 }
@@ -56,6 +57,9 @@ window.addEventListener('resize', () => { resize(); galaxyView.fit(); });
 // --- UI イベント ---
 $('tab-galaxy').onclick = () => app.setView('galaxy');
 $('tab-system').onclick = () => app.setView('system');
+$('zoom-in').onclick = () => galaxyView.zoomAt(1.5, w / 2, h / 2);
+$('zoom-out').onclick = () => galaxyView.zoomAt(1 / 1.5, w / 2, h / 2);
+$('zoom-fit').onclick = () => galaxyView.fit();
 $('newgame').onclick = () => newGame(String(Math.floor(Math.random() * 1e6)));
 document.querySelectorAll('[data-speed]').forEach((b) => {
   b.onclick = () => { app.speed = Number(b.dataset.speed); updateSpeedButtons(); };
