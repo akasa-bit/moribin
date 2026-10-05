@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Moribin — 恒星間入植</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Moribin</h1>
+    <nav>
+      <button id="tab-galaxy" class="tab on">星間マップ</button>
+      <button id="tab-system" class="tab">星系マップ</button>
+    </nav>
+    <div id="date">西暦 2300.0 年</div>
+    <div id="speed">
+      <button data-speed="0">⏸</button>
+      <button data-speed="1">1年/秒</button>
+      <button data-speed="4">4</button>
+      <button data-speed="16">16</button>
+      <button data-speed="64">64</button>
+    </div>
+    <button id="newgame" class="ghost">新しい銀河</button>
+  </header>
+  <main>
+    <canvas id="map"></canvas>
+    <aside>
+      <div id="panel"></div>
+      <h3>航行中の入植船</h3>
+      <div id="ships"></div>
+      <h3>ログ</h3>
+      <div id="log"></div>
+    </aside>
+  </main>
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
