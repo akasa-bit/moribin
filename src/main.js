@@ -2,6 +2,7 @@ import { generateGalaxy } from './galaxy.js';
 import { Game } from './game.js';
 import { GalaxyView } from './galaxyView.js';
 import { SystemView } from './systemView.js';
+import { writeSave, readSave, clearSave } from './save.js';
 import { systemPanel, bodyPanel, shipsHtml, logHtml } from './panel.js';
 
 const params = new URLSearchParams(location.search);
@@ -60,7 +61,30 @@ $('tab-system').onclick = () => app.setView('system');
 $('zoom-in').onclick = () => galaxyView.zoomAt(1.5, w / 2, h / 2);
 $('zoom-out').onclick = () => galaxyView.zoomAt(1 / 1.5, w / 2, h / 2);
 $('zoom-fit').onclick = () => galaxyView.fit();
-$('newgame').onclick = () => newGame(String(Math.floor(Math.random() * 1e6)));
+// 「新しい銀河」はセーブを消すので、2回押して確定する(confirm() は使えない環境がある)
+let armed = 0;
+$('newgame').onclick = () => {
+  const b = $('newgame');
+  if (!armed) {
+    b.textContent = '本当に? セーブが消えます';
+    armed = setTimeout(() => { armed = 0; b.textContent = '新しい銀河'; }, 4000);
+    return;
+  }
+  clearTimeout(armed);
+  armed = 0;
+  b.textContent = '新しい銀河';
+  clearSave();
+  newGame(String(Math.floor(Math.random() * 1e6)));
+  save();
+};
+
+function save() {
+  const ok = writeSave(app.game, { speed: app.speed });
+  $('savestat').textContent = ok ? `自動セーブ済み ${app.game.year.toFixed(1)}年` : 'セーブ不可(この環境では保存できません)';
+}
+setInterval(save, 5000);
+window.addEventListener('pagehide', save);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 document.querySelectorAll('[data-speed]').forEach((b) => {
   b.onclick = () => { app.speed = Number(b.dataset.speed); updateSpeedButtons(); };
 });
@@ -90,6 +114,7 @@ panel.addEventListener('click', (e) => {
     const r = app.game.dispatch(from, app.sel.sys, app.sel.body, kind);
     if (!r.ok) app.game.message(`派遣できない: ${r.reason}`);
     app.dirty = true;
+    save();
   }
 });
 panel.addEventListener('change', (e) => {
@@ -129,7 +154,20 @@ function frame(now) {
 }
 
 resize();
-newGame(params.get('seed') || '1');
+const saved = readSave();
+const wanted = params.get('seed');
+if (saved && (wanted === null || wanted === String(saved.seed))) {
+  newGame(saved.seed);
+  if (app.game.restore(saved)) {
+    app.speed = SPEEDS.includes(saved.speed) ? saved.speed : 1;
+    app.game.message('セーブデータをロードした。');
+  } else {
+    newGame(saved.seed); // 壊れたデータは破棄
+  }
+} else {
+  newGame(wanted || String(Math.floor(Math.random() * 1e6)));
+}
 updateSpeedButtons();
+save();
 requestAnimationFrame(frame);
 window.__app = app; // デバッグ用

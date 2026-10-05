@@ -82,6 +82,19 @@ export class Game {
     return true;
   }
 
+  // セーブデータの復元。壊れたデータなら false を返し、状態は変えない。
+  restore(d) {
+    const ok = (sysId, bodyId) => this.galaxy.systems[sysId] && this.target(sysId, bodyId);
+    if (!Array.isArray(d.colonies) || !Array.isArray(d.ships) || !Number.isFinite(d.year)) return false;
+    if (!d.colonies.every((c) => ok(c.sys, c.body)) || !d.ships.every((s) => ok(s.to, s.body) && this.galaxy.systems[s.from])) return false;
+    this.year = d.year;
+    this.colonies = d.colonies;
+    this.ships = d.ships;
+    this.log = Array.isArray(d.log) ? d.log : [];
+    this.nextShipId = d.nextShipId || 1;
+    return true;
+  }
+
   message(text) {
     this.log.unshift({ year: this.year, text });
     this.log.length = Math.min(this.log.length, 30);
